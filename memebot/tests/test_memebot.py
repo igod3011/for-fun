@@ -78,5 +78,17 @@ class BacktestTests(unittest.TestCase):
         self.assertGreater(s1["final_equity"], 0)
 
 
+class HeliusTests(unittest.TestCase):
+    def test_holder_features_exclude_pool(self):
+        from memebot.helius import holder_features
+        accs = [{"owner": "POOL", "amount": "500"}, {"owner": "A", "amount": "200"},
+                {"owner": "B", "amount": "100"}, {"owner": "B", "amount": "100"}, {"owner": "C", "amount": "0"}]
+        f = holder_features(accs, exclude_owners=["POOL"])
+        self.assertEqual(f["holders"], 3)                 # C holds nothing
+        self.assertAlmostEqual(f["pool_pct"], 500 / 900)
+        self.assertAlmostEqual(f["top1_pct"], 200 / 900)  # A and B both hold 200 of 900 total
+        self.assertAlmostEqual(f["top10_pct"], 400 / 900)  # pool excluded
+
+
 if __name__ == "__main__":
     unittest.main()
