@@ -35,6 +35,8 @@ def load(path, require_rugcheck=True, assumed_liq=25_000.0):
         rc = p.get("rugcheck")
         if require_rugcheck and not rc:
             continue
+        if len(p.get("candles") or []) < 30:      # dead/empty pools are counted by report.py
+            continue
         rc = rc or {}
         raw = {int(c[0] // 60): c for c in p["candles"]}
         lo, hi = min(raw), max(raw)
