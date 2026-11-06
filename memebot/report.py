@@ -17,6 +17,12 @@ def main(path):
     if rc:
         print(f"RugCheck: mint active {sum(not r['mint_revoked'] for r in rc)}/{len(rc)}, "
               f"freeze active {sum(not r['freeze_revoked'] for r in rc)}/{len(rc)}, rugged {sum(r['rugged'] for r in rc)}/{len(rc)}")
+    both = [p for p in rows if p.get("helius_reg") and p.get("helius_fill")
+            and p["helius_reg"].get("pool_sol") and p["helius_fill"].get("pool_sol") is not None]
+    if both:
+        drained = [p for p in both if p["helius_fill"]["pool_sol"] < 0.2 * p["helius_reg"]["pool_sol"]]
+        print(f"Helius snapshots at registration AND fill: {len(both)} pools; "
+              f"pool SOL fell >80% (likely liquidity pulled / rug): {len(drained)} ({len(drained)/len(both):.0%})")
     if live:
         import statistics as st
         # entry = open of the 6th candle (5 min after first trade); exit = close of the last candle

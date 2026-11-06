@@ -9,6 +9,7 @@ Usage: python -m memebot.collect --out DATA.jsonl --max-pools 150
 """
 import argparse
 import json
+import os
 import time
 import urllib.error
 import urllib.request
@@ -96,6 +97,17 @@ def rugcheck(mint):
             "creator": rep.get("creator"), "total_holders": rep.get("totalHolders")}
 
 
+def helius_snapshot(p):
+    """Pool/holder snapshot via Helius if HELIUS_API_KEY is set; never raises."""
+    if not os.environ.get("HELIUS_API_KEY"):
+        return None
+    try:
+        from .helius import enrich_one
+        return enrich_one(p)
+    except BaseException as e:      # SystemExit from a missing key, network errors, ...
+        return {"error": str(e)[:120]}
+
+
 def fill(path, min_age_h):
     rows = [json.loads(l) for l in open(path)]
     now, n = time.time(), 0
@@ -105,6 +117,9 @@ def fill(path, min_age_h):
         o = get(f"{GT}/pools/{p['pool']}/ohlcv/minute?aggregate=1&limit=1000&currency=usd")
         p["candles"] = sorted(o["data"]["attributes"]["ohlcv_list"]) if o else []   # keep empty: dead pools count!
         p["rugcheck"] = rugcheck(p["mint"])
+        snap = helius_snapshot(p)
+        if snap:
+            p["helius_fill"] = snap
         p["fetched_at"] = int(time.time())
         n += 1
         print(f"filled {p['name']} candles={len(p['candles'])}", flush=True)
@@ -138,6 +153,9 @@ def main():
         with open(a.out, "a") as f:
             for p in pools:
                 p["registered_at"] = int(time.time())
+                snap = helius_snapshot(p)
+                if snap:
+                    p["helius_reg"] = snap
                 f.write(json.dumps(p) + "\n")
         span = SPAN_MIN["v"]
         print(f"registered {len(pools)} pools | pages cover {span:.0f} min of new pools"

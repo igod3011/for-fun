@@ -92,6 +92,13 @@ def enrich_one(row):
         f["supply_raw"] = ti.get("supply")
     except RuntimeError as e:
         f["asset_error"] = str(e)[:120]
+    try:   # real pool reserves: SOL = liquidity side, tokens = inventory side. A rug empties both.
+        for key, m in (("pool_sol", WSOL), ("pool_tokens", mint)):
+            v = rpc("getTokenAccountsByOwner", [row["pool"], {"mint": m}, {"encoding": "jsonParsed"}])
+            f[key] = sum(float(x["account"]["data"]["parsed"]["info"]["tokenAmount"]["uiAmount"] or 0)
+                         for x in v.get("value", []))
+    except (RuntimeError, KeyError, TypeError) as e:
+        f["pool_error"] = str(e)[:120]
     f["fetched_at"] = int(time.time())
     return f
 
@@ -128,6 +135,8 @@ def inspect(path, key):
     pool_accs = rpc("getTokenAccountsByOwner", [row["pool"], {"mint": row["mint"]}, {"encoding": "jsonParsed"}])
     bal = [x["account"]["data"]["parsed"]["info"]["tokenAmount"]["uiAmountString"] for x in pool_accs.get("value", [])]
     print(f"  pool address token balances (getTokenAccountsByOwner): {bal or 'none'}")
+    sol = rpc("getTokenAccountsByOwner", [row["pool"], {"mint": WSOL}, {"encoding": "jsonParsed"}])
+    print("  pool wSOL balance:", [x["account"]["data"]["parsed"]["info"]["tokenAmount"]["uiAmountString"] for x in sol.get("value", [])] or "none")
 
 
 def selftest(data=None):
