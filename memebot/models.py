@@ -24,6 +24,7 @@ class TokenMeta:
     freeze_revoked: bool = True
     top10_pct: float = 0.0       # share of supply held by top 10 wallets (0..1)
     lp_locked_pct: float = 1.0   # share of LP burned/locked (0..1)
+    rugged: bool = False         # flagged as rugged by an external checker (RugCheck)
 
 
 @dataclass

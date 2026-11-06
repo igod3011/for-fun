@@ -38,21 +38,29 @@ def best_pair(addr):
 
 
 def rugcheck_meta(addr, created_min):
-    """Map RugCheck's risk list onto TokenMeta. Unknown => assume the worst."""
+    """Map a RugCheck /report onto TokenMeta. Unknown / failed fetch => assume the worst."""
     meta = TokenMeta(addr, addr[:6], created_min, mint_revoked=False, freeze_revoked=False,
                      top10_pct=1.0, lp_locked_pct=0.0)
     try:
         rep = get(f"https://api.rugcheck.xyz/v1/tokens/{addr}/report")
     except Exception:
         return meta
-    risks = " | ".join(r.get("name", "").lower() for r in rep.get("risks", []))
-    meta.mint_revoked = "mint authority" not in risks
-    meta.freeze_revoked = "freeze authority" not in risks
-    top = rep.get("topHolders") or []
-    meta.top10_pct = sum(h.get("pct", 0) for h in top[:10]) / 100 if top else 1.0
-    lps = rep.get("markets") or []
-    if lps:
-        meta.lp_locked_pct = max((m.get("lp", {}).get("lpLockedPct", 0) for m in lps), default=0) / 100
+    meta.mint_revoked = rep.get("mintAuthority") is None     # null => revoked
+    meta.freeze_revoked = rep.get("freezeAuthority") is None
+    meta.rugged = bool(rep.get("rugged"))
+    markets = rep.get("markets") or []
+    # the AMM pool's own token account shows up as a "holder": exclude it
+    pool = set()
+    for m in markets:
+        pool |= {m.get("pubkey"), m.get("liquidityA"), m.get("liquidityB")}
+    holders = [h for h in (rep.get("topHolders") or [])
+               if h.get("owner") not in pool and h.get("address") not in pool]
+    if holders:
+        meta.top10_pct = sum(h.get("pct", 0) for h in holders[:10]) / 100
+    pcts = [(m.get("lp") or {}).get("lpLockedPct") for m in markets]
+    pcts = [x for x in pcts if x is not None]
+    if pcts:
+        meta.lp_locked_pct = max(pcts) / 100
     return meta
 
 
@@ -85,6 +93,7 @@ def main():
     ap.add_argument("--strategy", choices=list(STRATEGIES), default="breakout_volume")
     ap.add_argument("--interval", type=int, default=60)
     ap.add_argument("--once", action="store_true")
+    ap.add_argument("--max-watch", type=int, default=40)
     a = ap.parse_args()
     cfg, feed = Config(), Feed()
     eng = Engine(cfg, STRATEGIES[a.strategy])
@@ -92,7 +101,9 @@ def main():
     while True:
         now = int(time.time() // 60)
         try:
-            watch |= set(new_solana_tokens())
+            for t in new_solana_tokens():
+                if len(watch) < a.max_watch:
+                    watch.add(t)
         except Exception as e:
             print("profile fetch failed:", e)
         for addr in list(watch) + list(eng.broker.positions):

@@ -5,7 +5,7 @@ Soft flags add to a score; entry is blocked once the score reaches cfg.max_score
 """
 from dataclasses import dataclass, field
 
-HARD = {"mint_authority_active", "freeze_authority_active", "liquidity_drain", "dump"}
+HARD = {"mint_authority_active", "freeze_authority_active", "liquidity_drain", "dump", "rugged"}
 WEIGHTS = {
     "top10_concentrated": 40,
     "lp_not_locked": 40,
@@ -39,6 +39,8 @@ def assess(meta, candles, cfg):
         a.flags.append(flag)
         a.score += 100 if flag in HARD else WEIGHTS.get(flag, 0)
 
+    if meta.rugged:
+        add("rugged")
     if not meta.mint_revoked:
         add("mint_authority_active")
     if not meta.freeze_revoked:

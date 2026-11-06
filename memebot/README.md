@@ -6,7 +6,7 @@ Paper trading only: no wallet, no private keys, no real orders.
 ```bash
 python3 -m memebot.backtest --strategy breakout_volume --n 600 --seed 11   # synthetic backtest
 python3 -m unittest memebot.tests.test_memebot                             # tests
-python3 -m memebot.live --once    # live paper run (needs access to dexscreener/rugcheck; UNTESTED)
+python3 -m memebot.live --once    # live paper run (needs access to api.dexscreener.com + api.rugcheck.xyz)
 ```
 
 ## How it works
@@ -22,7 +22,9 @@ python3 -m memebot.live --once    # live paper run (needs access to dexscreener/
 
 ## Honest limitations
 - Backtest data is **synthetic** (hand-made generator). It proves the plumbing and shows the filter blocks bad tokens; it does **not** prove an edge. Next step: record real candles + RugCheck results for a few weeks, then re-run.
-- `live.py` is untested against the real APIs. DexScreener has no OHLC, so live candles are approximated.
+- `live.py` was smoke-tested on real DexScreener/RugCheck responses (parsing + anomaly flags verified; no full paper session run yet, a signal needs >=16 one-minute candles). DexScreener has no OHLC, so live candles are approximated from 5-min rolling stats.
+- The `token-profiles/latest` feed lists tokens whose team paid for a DexScreener profile, so the universe is biased toward promoted tokens. Many have zero/low liquidity and are blocked by the filter.
+- RugCheck's `topHolders` includes the AMM pool account; the parser excludes it.
 - Not modelled: MEV/sniper front-running, failed transactions, Jito tips, honeypots that block sells (RugCheck only partly catches them), pump.fun bonding-curve phase (before graduation to a DEX pool).
 - Most memecoin trades lose money. Expect a large share of tokens to be rugs; filters reduce, not remove, that.
 
