@@ -34,3 +34,14 @@ python3 -m memebot.live --once    # live paper run (needs access to api.dexscree
 - Dev-wallet tracking: flag creators who launched previous rugs.
 - Sell simulation via Jupiter quote API before entry (honeypot check).
 - Social/volume divergence filters.
+
+## Research tooling & data (added later)
+- `ml/melt_data.py`, `ml/train_rug_model.py` – safe loader (restricted unpickler) + time-split LightGBM rug detector on the MELT dataset
+  (AUROC 0.90 on the newest 30% of 41k launches). Filtering predicted-rug tokens improves the median outcome (-70% -> -40% at the
+  strictest cut) but the remaining tokens still lose on average: **buying at migration has no edge even with a good rug filter.**
+- `collect.py` / `realtest.py` – collect real PumpSwap candles (GeckoTerminal) and backtest the engine on them.
+  **Do not draw conclusions from `--source top` data**: that list is ranked by activity, so it is biased toward tokens that did well,
+  and the first candle of each pool opens at the pool's initial price (not a tradable price). An earlier run showed +250%/+526%
+  average returns for "buy at migration"; both were artifacts (look-ahead via collection-time liquidity, then selection bias).
+  An unbiased test needs a forward cohort: `--source new --register-only` repeatedly for days, then `--fill` >=3h later.
+  Only ~1 in 58 launches graduates, so expect a few new pools per 20 minutes.

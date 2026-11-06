@@ -3,8 +3,9 @@
 Real-data limitations (be honest when reading results):
   * GeckoTerminal OHLCV has no buy/sell split or maker counts: buys=sells=1 (neutral),
     so buy-ratio, wash-trading and sell-pressure checks are inert here.
-  * Liquidity is one snapshot taken at collection time, applied to every candle, so the
-    liquidity-drain flag cannot fire; protection comes from stop-loss / RugCheck statics.
+  * Liquidity is a FIXED assumption (--liq, default $25k). Never use the collection-time
+    reserve: it is known only in hindsight and filtering on it leaks the outcome (this
+    produced a bogus +250% result once). The liquidity-drain flag therefore cannot fire.
   * Survivorship bias: pools are listed some hours after creation, so rugs that already
     went to zero and got delisted may be missing. Results are optimistic.
 """
@@ -27,7 +28,7 @@ def buy_at_migration(candles, cfg):
 STRATEGIES_REAL = dict(STRATEGIES, buy_at_migration=buy_at_migration)
 
 
-def load(path, require_rugcheck=True):
+def load(path, require_rugcheck=True, assumed_liq=25_000.0):
     toks = []
     for line in open(path):
         p = json.loads(line)
@@ -42,9 +43,9 @@ def load(path, require_rugcheck=True):
             if m in raw:
                 _, o, h, l, c, v = raw[m]
                 last = c
-                out.append(Candle(m, o, h, l, c, v, 1, 1, 2, p["reserve_usd"]))
+                out.append(Candle(m, o, h, l, c, v, 1, 1, 2, assumed_liq))
             elif last is not None:
-                out.append(Candle(m, last, last, last, last, 0.0, 0, 0, 0, p["reserve_usd"]))
+                out.append(Candle(m, last, last, last, last, 0.0, 0, 0, 0, assumed_liq))
         meta = TokenMeta(
             p["mint"], p["name"], p["created"] // 60,
             mint_revoked=rc.get("mint_revoked", False), freeze_revoked=rc.get("freeze_revoked", False),
@@ -58,8 +59,9 @@ def load(path, require_rugcheck=True):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", required=True)
+    ap.add_argument("--liq", type=float, default=25_000.0)
     a = ap.parse_args()
-    toks = load(a.data)
+    toks = load(a.data, assumed_liq=a.liq)
     print(f"tokens loaded: {len(toks)}")
     cfg = replace(Config(), max_age_min=900, min_buy_ratio=0.0, max_hold_min=240)
     print(f"{'strategy':18} {'filter':6} {'trades':>6} {'win%':>6} {'avg_ret':>8} {'worst':>7} {'total':>7} {'maxDD':>6}")

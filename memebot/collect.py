@@ -37,16 +37,20 @@ def parse_ts(s):
     return int(datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp())
 
 
-def candidate_pools(max_pools, min_age_h, max_age_h):
+def candidate_pools(max_pools, min_age_h, max_age_h, source="top"):
     now = time.time()
     out, seen = [], set()
     for page in range(1, 11):
-        d = get(f"{GT}/dexes/pumpswap/pools?page={page}&include=base_token")
+        url = (f"{GT}/new_pools?page={page}&include=base_token" if source == "new"
+               else f"{GT}/dexes/pumpswap/pools?page={page}&include=base_token")
+        d = get(url)
         if not d or not d.get("data"):
             break
         for p in d["data"]:
             a = p["attributes"]
             addr = a["address"]
+            if source == "new" and p["relationships"]["dex"]["data"]["id"] != "pumpswap":
+                continue
             if addr in seen:
                 continue
             seen.add(addr)
@@ -88,19 +92,51 @@ def rugcheck(mint):
             "creator": rep.get("creator"), "total_holders": rep.get("totalHolders")}
 
 
+def fill(path, min_age_h):
+    rows = [json.loads(l) for l in open(path)]
+    now, n = time.time(), 0
+    for p in rows:
+        if "candles" in p or (now - p["created"]) / 3600 < min_age_h:
+            continue
+        o = get(f"{GT}/pools/{p['pool']}/ohlcv/minute?aggregate=1&limit=1000&currency=usd")
+        p["candles"] = sorted(o["data"]["attributes"]["ohlcv_list"]) if o else []   # keep empty: dead pools count!
+        p["rugcheck"] = rugcheck(p["mint"])
+        p["fetched_at"] = int(time.time())
+        n += 1
+        print(f"filled {p['name']} candles={len(p['candles'])}", flush=True)
+    with open(path, "w") as f:
+        for p in rows:
+            f.write(json.dumps(p) + "\n")
+    print(f"filled {n} pools; {sum('candles' not in p for p in rows)} still waiting", flush=True)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
     ap.add_argument("--max-pools", type=int, default=150)
     ap.add_argument("--min-age-h", type=float, default=2.0)
     ap.add_argument("--max-age-h", type=float, default=15.5)
+    ap.add_argument("--source", choices=["top", "new"], default="top",
+                    help="top = biased toward tokens that did well (DON'T backtest on it); new = unbiased cohort")
+    ap.add_argument("--register-only", action="store_true",
+                    help="store the cohort (no candles yet); fill later with --fill")
+    ap.add_argument("--fill", action="store_true", help="fetch candles for registered pools older than --min-age-h")
     a = ap.parse_args()
     done = set()
     try:
         done = {json.loads(l)["pool"] for l in open(a.out)}
     except FileNotFoundError:
         pass
-    pools = [p for p in candidate_pools(a.max_pools, a.min_age_h, a.max_age_h) if p["pool"] not in done]
+    if a.fill:
+        return fill(a.out, a.min_age_h)
+    pools = [p for p in candidate_pools(a.max_pools, a.min_age_h, a.max_age_h, a.source) if p["pool"] not in done]
+    if a.register_only:
+        with open(a.out, "a") as f:
+            for p in pools:
+                p["registered_at"] = int(time.time())
+                f.write(json.dumps(p) + "\n")
+        print(f"registered {len(pools)} pools", flush=True)
+        return
     print(f"{len(pools)} new pools to fetch", flush=True)
     with open(a.out, "a") as f:
         for i, p in enumerate(pools, 1):
