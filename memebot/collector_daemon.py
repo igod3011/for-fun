@@ -3,7 +3,7 @@
   python3 -m memebot.collector_daemon --out cohort.jsonl
 
 Every --register-every minutes (default 2; the newest-200-pools window only spans ~4 min): record newly migrated (PumpSwap) pools, whatever their later fate.
-Every --fill-every minutes (default 10, <=10 pools per pass so registration is never starved): fetch candles + RugCheck for registered pools older than 3h
+Every --fill-every minutes (default 5, <=20 pools per pass (~2.5 min) so registration is never starved; GeckoTerminal keeps only ~16.6h of 1-min candles, so the backlog must not grow): fetch candles + RugCheck for registered pools older than 3h
 (dead pools are kept with empty candles: dropping them would reintroduce survivorship bias).
 Safe to stop/restart; data is appended/rewritten in --out. Ctrl+C to stop.
 """
@@ -32,7 +32,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
     ap.add_argument("--register-every", type=int, default=2)
-    ap.add_argument("--fill-every", type=int, default=10)
+    ap.add_argument("--fill-every", type=int, default=5)
     a = ap.parse_args()
     nxt_reg = nxt_fill = 0.0
     while True:
@@ -41,7 +41,7 @@ def main():
             run("--out", a.out, "--source", "new", "--register-only", "--min-age-h", "0", "--max-age-h", "3", "--max-pools", "100")
             nxt_reg = time.time() + a.register_every * 60
         if now >= nxt_fill:
-            run("--out", a.out, "--fill", "--min-age-h", "3", "--max-fill", "10")
+            run("--out", a.out, "--fill", "--min-age-h", "3", "--max-fill", "20")
             nxt_fill = time.time() + a.fill_every * 60
         time.sleep(30)
 
