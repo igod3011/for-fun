@@ -139,7 +139,8 @@ def fill(path, min_age_h, max_fill=10):
             continue
         n += 1
         print(f"filled {p['name'].encode('ascii', 'replace').decode()} candles={len(p['candles'])}", flush=True)
-        _save(path, rows)                           # progress survives a crash
+        if n % 10 == 0:
+            _save(path, rows)   # rewrite the whole file only every 10 pools: it grows to ~100+ MB (disk wear / CPU)
     _save(path, rows)
     print(f"filled {n} pools; {sum('candles' not in p for p in rows)} still waiting", flush=True)
 
