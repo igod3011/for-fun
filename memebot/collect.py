@@ -15,6 +15,7 @@ import urllib.request
 from datetime import datetime, timezone
 
 GT = "https://api.geckoterminal.com/api/v2/networks/solana"
+SPAN_MIN = {"v": None}   # minutes of history covered by the newest-pools pages of the last discovery
 HDR = {"User-Agent": "memebot-research/0.1", "accept": "application/json;version=20230302"}
 
 
@@ -40,6 +41,7 @@ def parse_ts(s):
 def candidate_pools(max_pools, min_age_h, max_age_h, source="top"):
     now = time.time()
     out, seen = [], set()
+    oldest = now
     for page in range(1, 11):
         url = (f"{GT}/new_pools?page={page}&include=base_token" if source == "new"
                else f"{GT}/dexes/pumpswap/pools?page={page}&include=base_token")
@@ -49,6 +51,7 @@ def candidate_pools(max_pools, min_age_h, max_age_h, source="top"):
         for p in d["data"]:
             a = p["attributes"]
             addr = a["address"]
+            oldest = min(oldest, parse_ts(a["pool_created_at"]))
             if source == "new" and p["relationships"]["dex"]["data"]["id"] != "pumpswap":
                 continue
             if addr in seen:
@@ -65,6 +68,7 @@ def candidate_pools(max_pools, min_age_h, max_age_h, source="top"):
         print(f"page {page}: candidates={len(out)}", flush=True)
         if len(out) >= max_pools:
             break
+    SPAN_MIN["v"] = (now - oldest) / 60 if source == "new" else None
     return out[:max_pools]
 
 
@@ -135,7 +139,9 @@ def main():
             for p in pools:
                 p["registered_at"] = int(time.time())
                 f.write(json.dumps(p) + "\n")
-        print(f"registered {len(pools)} pools", flush=True)
+        span = SPAN_MIN["v"]
+        print(f"registered {len(pools)} pools | pages cover {span:.0f} min of new pools"
+              + (" -> GAP risk: run more often than this!" if span is not None and span < 6 else ""), flush=True)
         return
     print(f"{len(pools)} new pools to fetch", flush=True)
     with open(a.out, "a") as f:
