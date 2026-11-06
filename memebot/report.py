@@ -23,14 +23,19 @@ def main(path):
         drained = [p for p in both if p["helius_fill"]["pool_sol"] < 0.2 * p["helius_reg"]["pool_sol"]]
         print(f"Helius snapshots at registration AND fill: {len(both)} pools; "
               f"pool SOL fell >80% (likely liquidity pulled / rug): {len(drained)} ({len(drained)/len(both):.0%})")
+    if filled:
+        print(f"dead/illiquid: {len(filled) - len(live)}/{len(filled)} filled pools ({(len(filled) - len(live)) / len(filled):.0%}) "
+              f"traded in fewer than 30 minutes of their first 3h+ -> most graduated memecoins die almost immediately")
     if live:
         import statistics as st
-        # entry = open of the 6th candle (5 min after first trade); exit = close of the last candle
-        r = [p["candles"][-1][4] / sorted(p["candles"])[5][1] - 1 for p in live if len(p["candles"]) > 6]
-        if r:
-            print(f"naive buy@candle6, hold to end of data: n={len(r)} median {st.median(r):+.0%}, "
-                  f"mean {st.mean(r):+.0%}, share>0 {sum(x > 0 for x in r)/len(r):.0%}  (no costs/slippage)")
-
+        # entry = open of the 6th trading minute; exit = close of the last candle. Uses ONLY pools that stayed
+        # alive (survivorship bias!) and raw GeckoTerminal prices (first candle can be a bogus pool-init price),
+        # so read the median/quartiles only; the mean is dominated by outliers and is deliberately not printed.
+        r = sorted(p["candles"][-1][4] / sorted(p["candles"])[5][1] - 1 for p in live if len(p["candles"]) > 6)
+        if len(r) >= 4:
+            q = st.quantiles(r, n=4)
+            print(f"naive buy@candle6 -> last close, SURVIVORS ONLY, no costs: n={len(r)} "
+                  f"quartiles {q[0]:+.0%} / {q[1]:+.0%} / {q[2]:+.0%}, share>0 {sum(x > 0 for x in r)/len(r):.0%}")
 
 if __name__ == "__main__":
     main(sys.argv[1])

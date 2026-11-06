@@ -8,13 +8,15 @@ Every --fill-every minutes (default 10, <=10 pools per pass so registration is n
 Safe to stop/restart; data is appended/rewritten in --out. Ctrl+C to stop.
 """
 import argparse
+import os
 import subprocess
 import sys
 import time
 
 
 def run(*args):
-    r = subprocess.run([sys.executable, "-m", "memebot.collect", *args], capture_output=True, text=True)
+    r = subprocess.run([sys.executable, "-m", "memebot.collect", *args], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace", env={**os.environ, "PYTHONIOENCODING": "utf-8"})
     last = (r.stdout.strip().splitlines() or ["(no output)"])[-1]
     print(time.strftime("%F %T"), "|", " ".join(args[:4]), "->", last, flush=True)
     if r.returncode:
@@ -22,6 +24,11 @@ def run(*args):
 
 
 def main():
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
     ap.add_argument("--register-every", type=int, default=2)

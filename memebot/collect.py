@@ -10,6 +10,7 @@ Usage: python -m memebot.collect --out DATA.jsonl --max-pools 150
 import argparse
 import json
 import os
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -108,6 +109,14 @@ def helius_snapshot(p):
         return {"error": str(e)[:120]}
 
 
+def _save(path, rows):
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:          # json.dumps is ASCII-only, so no encoding problems on Windows
+        for r in rows:
+            f.write(json.dumps(r) + "\n")
+    os.replace(tmp, path)
+
+
 def fill(path, min_age_h, max_fill=10):
     rows = [json.loads(l) for l in open(path)]
     now, n = time.time(), 0
@@ -116,22 +125,31 @@ def fill(path, min_age_h, max_fill=10):
             continue
         if n >= max_fill:      # bounded pass: fill must not starve registration (they share one file)
             break
-        o = get(f"{GT}/pools/{p['pool']}/ohlcv/minute?aggregate=1&limit=1000&currency=usd")
-        p["candles"] = sorted(o["data"]["attributes"]["ohlcv_list"]) if o else []   # keep empty: dead pools count!
-        p["rugcheck"] = rugcheck(p["mint"])
-        snap = helius_snapshot(p)
-        if snap:
-            p["helius_fill"] = snap
-        p["fetched_at"] = int(time.time())
+        try:
+            o = get(f"{GT}/pools/{p['pool']}/ohlcv/minute?aggregate=1&limit=1000&currency=usd")
+            p["candles"] = sorted(o["data"]["attributes"]["ohlcv_list"]) if o else []   # keep empty: dead pools count!
+            p["rugcheck"] = rugcheck(p["mint"])
+            snap = helius_snapshot(p)
+            if snap:
+                p["helius_fill"] = snap
+            p["fetched_at"] = int(time.time())
+        except Exception as e:                      # one bad pool must not kill the pass
+            p.pop("candles", None)
+            print(f"skip pool {p.get('mint', '?')[:8]}: {type(e).__name__}", flush=True)
+            continue
         n += 1
-        print(f"filled {p['name']} candles={len(p['candles'])}", flush=True)
-    with open(path, "w") as f:
-        for p in rows:
-            f.write(json.dumps(p) + "\n")
+        print(f"filled {p['name'].encode('ascii', 'replace').decode()} candles={len(p['candles'])}", flush=True)
+        _save(path, rows)                           # progress survives a crash
+    _save(path, rows)
     print(f"filled {n} pools; {sum('candles' not in p for p in rows)} still waiting", flush=True)
 
 
 def main():
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
     ap.add_argument("--max-pools", type=int, default=150)
