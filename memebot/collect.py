@@ -108,12 +108,14 @@ def helius_snapshot(p):
         return {"error": str(e)[:120]}
 
 
-def fill(path, min_age_h):
+def fill(path, min_age_h, max_fill=10):
     rows = [json.loads(l) for l in open(path)]
     now, n = time.time(), 0
     for p in rows:
         if "candles" in p or (now - p["created"]) / 3600 < min_age_h:
             continue
+        if n >= max_fill:      # bounded pass: fill must not starve registration (they share one file)
+            break
         o = get(f"{GT}/pools/{p['pool']}/ohlcv/minute?aggregate=1&limit=1000&currency=usd")
         p["candles"] = sorted(o["data"]["attributes"]["ohlcv_list"]) if o else []   # keep empty: dead pools count!
         p["rugcheck"] = rugcheck(p["mint"])
@@ -140,6 +142,7 @@ def main():
     ap.add_argument("--register-only", action="store_true",
                     help="store the cohort (no candles yet); fill later with --fill")
     ap.add_argument("--fill", action="store_true", help="fetch candles for registered pools older than --min-age-h")
+    ap.add_argument("--max-fill", type=int, default=10, help="max pools per --fill pass")
     a = ap.parse_args()
     done = set()
     try:
@@ -147,7 +150,7 @@ def main():
     except FileNotFoundError:
         pass
     if a.fill:
-        return fill(a.out, a.min_age_h)
+        return fill(a.out, a.min_age_h, a.max_fill)
     pools = [p for p in candidate_pools(a.max_pools, a.min_age_h, a.max_age_h, a.source) if p["pool"] not in done]
     if a.register_only:
         with open(a.out, "a") as f:
