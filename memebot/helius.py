@@ -96,6 +96,40 @@ def enrich_one(row):
     return f
 
 
+SYSTEM_PROGRAM = "11111111111111111111111111111111"
+
+
+def owner_kind(addr):
+    """wallet = system-owned account; program-owned = a program/PDA account; no-account = never funded (often a PDA)."""
+    r = rpc("getAccountInfo", [addr, {"encoding": "base64", "dataSlice": {"offset": 0, "length": 0}}])
+    v = r.get("value")
+    if v is None:
+        return "no-account (PDA or empty wallet)"
+    return "wallet" if v.get("owner") == SYSTEM_PROGRAM else f"program-owned ({v.get('owner')[:8]}..)"
+
+
+def inspect(path, key):
+    rows = [json.loads(l) for l in open(path)]
+    row = next((r for r in rows if key == r.get("mint") or key.lower() in (r.get("name") or "").lower()), None)
+    if not row:
+        sys.exit(f"no row matching {key!r}")
+    rc = row.get("rugcheck") or {}
+    print(f"{row['name']}  mint={row['mint']}\n  pool={row['pool']}  reserve_usd@registration={row.get('reserve_usd')}")
+    print(f"  rugcheck: lp_locked={rc.get('lp_locked_pct')} rugged={rc.get('rugged')} top10(excl. pool)={rc.get('top10_pct')}")
+    accs = token_accounts(row["mint"])
+    by_owner = {}
+    for a in accs:
+        by_owner[a["owner"]] = by_owner.get(a["owner"], 0) + int(a.get("amount") or 0)
+    total = sum(by_owner.values()) or 1
+    print(f"  total supply in accounts={total}, owners={len(by_owner)}")
+    for o, v in sorted(by_owner.items(), key=lambda kv: -kv[1])[:5]:
+        tag = " <== THE POOL" if o == row["pool"] else ""
+        print(f"   {v/total*100:6.2f}%  {o[:10]}..  {owner_kind(o)}{tag}")
+    pool_accs = rpc("getTokenAccountsByOwner", [row["pool"], {"mint": row["mint"]}, {"encoding": "jsonParsed"}])
+    bal = [x["account"]["data"]["parsed"]["info"]["tokenAmount"]["uiAmountString"] for x in pool_accs.get("value", [])]
+    print(f"  pool address token balances (getTokenAccountsByOwner): {bal or 'none'}")
+
+
 def selftest(data=None):
     ok = True
 
@@ -144,9 +178,12 @@ def main():
     ap.add_argument("--enrich")
     ap.add_argument("--data")
     ap.add_argument("--max", type=int, default=50)
+    ap.add_argument("--inspect", help="token name or mint to inspect (uses --data)")
     a = ap.parse_args()
     if a.selftest:
         selftest(a.data)
+    elif a.inspect:
+        inspect(a.data, a.inspect)
     elif a.enrich:
         enrich_file(a.enrich, a.max)
     else:
