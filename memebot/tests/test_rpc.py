@@ -53,3 +53,23 @@ class StagedSnapshotTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HealthcheckSmokeTest(unittest.TestCase):
+    def test_runs_and_flags_missing_holder_data(self):
+        import json
+        import subprocess
+        import sys
+        import tempfile
+        import time
+        d = tempfile.mkdtemp()
+        now = int(time.time())
+        row = {"mint": "Apump", "pool": "p", "name": "a", "created": now - 600, "registered_at": now - 120,
+               "helius_reg": {"pool_sol": 85, "pool_tokens": 2.07e8}}
+        open(os.path.join(d, "cohort.jsonl"), "w").write(json.dumps(row) + "\n")
+        open(os.path.join(d, "daemon.log"), "w").write("x | registered 1 pools | pages cover 7 min of new pools\n")
+        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        r = subprocess.run([sys.executable, "-m", "memebot.healthcheck"], cwd=d, capture_output=True, text=True,
+                           env={**os.environ, "PYTHONPATH": root})
+        self.assertNotIn("Traceback", r.stderr)
+        self.assertIn("NO holder data", r.stdout)

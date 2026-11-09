@@ -85,9 +85,9 @@ def main():
         # 5) snapshots: reserves (free public RPC) for every pool; Helius holder data only for canonical pools
         recent = [r for r in rows if r.get("registered_at") and _age_min(r["registered_at"]) < 45]
         if recent:
-            res = [r for r in recent if (r.get("helius_reg") or {}).get("pool_sol") is not None]
-            out("PASS" if res else "FAIL", f"reserve snapshots (free RPC): {len(res)}/{len(recent)} recent pools")
-            canon = [r for r in res if r["mint"].endswith("pump") and r["helius_reg"].get("pool_tokens")
+            snapped = [r for r in recent if (r.get("helius_reg") or {}).get("pool_sol") is not None]
+            out("PASS" if snapped else "FAIL", f"reserve snapshots (free RPC): {len(snapped)}/{len(recent)} recent pools")
+            canon = [r for r in snapped if r["mint"].endswith("pump") and r["helius_reg"].get("pool_tokens")
                      and 0.5e10 <= r["helius_reg"]["pool_sol"] * r["helius_reg"]["pool_tokens"] <= 5e10]
             holders = [r for r in canon if r["helius_reg"].get("top_holders") is not None]
             errs = [r["helius_reg"]["holders_error"] for r in canon if r["helius_reg"].get("holders_error")]
