@@ -33,6 +33,14 @@ class BotConfig:
     chase_window_min: float = 10.0
     chase_stake_sol: float = 0.025
 
+    # follow "smart" wallets (step 3). OFF until memebot.ml.wallet_scores says PASS on real data
+    follow_enabled: bool = False
+    wallets_path: str = "smart_wallets.json"
+    follow_poll_s: float = 60.0
+    follow_min_wallets: int = 1         # how many watched wallets must buy the same mint ...
+    follow_window_min: float = 10.0     # ... within this many minutes
+    follow_max_wallets: int = 20
+
     # loop timing / files
     poll_positions_s: float = 15.0
     discover_every_s: float = 60.0

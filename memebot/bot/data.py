@@ -37,3 +37,16 @@ def pool_reserves(pool, mint):
         res.append(sum(float(x["account"]["data"]["parsed"]["info"]["tokenAmount"]["uiAmount"] or 0)
                        for x in v.get("value", [])))
     return res[0], res[1]
+
+
+def find_pumpswap_pool(mint, cohort_path, max_age_s=3 * 86400):
+    """Pool address for a mint: our own cohort first (no API call), else GeckoTerminal's token->pools."""
+    for r in reversed(recent_cohort_rows(cohort_path, max_age_s=max_age_s, tail_bytes=8_000_000)):
+        if r.get("mint") == mint:
+            return r["pool"]
+    from ..collect import GT, get
+    d = get(f"{GT}/tokens/{mint}/pools?page=1")
+    for p in (d or {}).get("data", []):
+        if (p.get("relationships", {}).get("dex", {}).get("data", {}) or {}).get("id") == "pumpswap":
+            return p["attributes"]["address"]
+    return None

@@ -79,10 +79,24 @@ def holder_features(accounts, exclude_owners=()):
     return f
 
 
+def top_owners(accounts, exclude_owners=(), n=10):
+    """[[owner, share_of_supply], ...] for the n largest holders, AMM pool excluded (unit-tested)."""
+    by_owner = {}
+    for a in accounts:
+        amt = int(a.get("amount") or 0)
+        if amt > 0:
+            by_owner[a["owner"]] = by_owner.get(a["owner"], 0) + amt
+    total = sum(by_owner.values()) or 1
+    ex = set(exclude_owners)
+    ranked = sorted(((o, v) for o, v in by_owner.items() if o not in ex), key=lambda kv: -kv[1])[:n]
+    return [[o, round(v / total, 5)] for o, v in ranked]
+
+
 def enrich_one(row):
     mint = row["mint"]
     accs = token_accounts(mint)
     f = holder_features(accs, exclude_owners=[row.get("pool")])
+    f["top_holders"] = top_owners(accs, [row.get("pool")], 10)   # addresses: lets us study "smart" wallets
     f["accounts_fetched"] = len(accs)
     try:
         asset = rpc("getAsset", {"id": mint})

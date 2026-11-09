@@ -15,17 +15,21 @@ import traceback
 
 from . import amm
 from .config import BotConfig
-from .data import pool_reserves, recent_cohort_rows
+from .data import find_pumpswap_pool, pool_reserves, recent_cohort_rows
 from .paper import Paper
 from .strategy import chase_check, entry_check, exit_decision
 from .review import load as load_log
 from .review import summary
 from .telegram import HELP, Telegram
+from .wallets import WalletWatcher, load_watchlist
 
 
 class Bot:
-    def __init__(self, cfg, tg, reserves=pool_reserves, rows=recent_cohort_rows):
+    def __init__(self, cfg, tg, reserves=pool_reserves, rows=recent_cohort_rows, watcher=None, find_pool=None):
         self.cfg, self.tg, self.reserves, self.rows = cfg, tg, reserves, rows
+        self.watcher, self.find_pool = watcher, find_pool
+        self.follow_hits = {}            # mint -> {wallet: ts}
+        self.followed = set()
         self.p = Paper(cfg)
         self.lock = threading.Lock()
         self.running = True
@@ -82,6 +86,44 @@ class Bot:
                         self.p.buy({"mint": mint}, sol, tok, self.cfg.chase_stake_sol, "chase", add_to=pos)
                         self.say(f"🟡 PAPER ADD {pos.name}: +{self.cfg.chase_stake_sol} SOL (chase)")
                 self.p.save()
+
+    def follow_step(self):
+        """Poll watched wallets; enter when enough of them bought the same pump.fun mint recently."""
+        now = time.time()
+        for wallet, mint in self.watcher.poll():
+            if not mint.endswith("pump"):
+                continue
+            self.follow_hits.setdefault(mint, {})[wallet] = now
+        for mint, hits in list(self.follow_hits.items()):
+            recent = {w: t for w, t in hits.items() if now - t <= self.cfg.follow_window_min * 60}
+            self.follow_hits[mint] = recent
+            if not recent:
+                del self.follow_hits[mint]
+                continue
+            if len(recent) < self.cfg.follow_min_wallets or mint in self.followed or mint in self.p.positions:
+                continue
+            self.followed.add(mint)
+            self.enter_follow(mint, sorted(recent))
+
+    def enter_follow(self, mint, wallets):
+        who = ", ".join(w[:6] for w in wallets)
+        pool = self.find_pool(mint) if self.find_pool else None
+        if not pool:
+            self.p.log(action="skip", mint=mint, reason=f"follow {who}: no PumpSwap pool found")
+            return
+        sol, tok = self.reserves(pool, mint)
+        if sol < self.cfg.min_pool_sol or not (self.cfg.k_min <= sol * tok <= self.cfg.k_max):
+            self.p.log(action="skip", mint=mint, reason=f"follow {who}: pool {sol:.1f} SOL / non-canonical")
+            return
+        with self.lock:
+            can, why_not = self.p.can_open(self.cfg.stake_sol)
+            if not can:
+                self.p.log(action="skip", mint=mint, reason=f"follow {who}: risk gate: {why_not}")
+                return
+            pos = self.p.buy({"mint": mint, "pool": pool, "name": mint[:6]}, sol, tok, self.cfg.stake_sol,
+                             f"follow {len(wallets)} wallet(s): {who}")
+        self.say(f"🐋 PAPER FOLLOW BUY {pos.name}\n{len(wallets)} watched wallet(s) bought: {who}\n"
+                 f"{self.cfg.stake_sol} SOL, pool {sol:.0f} SOL\nmint {mint}")
 
     def record_series(self, mint, sol, tok, now):
         """Reserve time series of held pools: lets us replay other exit rules on real data later."""
@@ -174,8 +216,14 @@ class Bot:
             self.say(f"⚠️ {where} error: {type(e).__name__}: {str(e)[:150]}")
 
     def loop(self, once=False):
-        nxt_disc = 0.0
+        nxt_disc = nxt_follow = 0.0
         while self.running:
+            if self.watcher and time.time() >= nxt_follow:
+                try:
+                    self.follow_step()
+                except Exception as e:
+                    self.error("follow", e)
+                nxt_follow = time.time() + self.cfg.follow_poll_s
             if time.time() >= nxt_disc:
                 try:
                     self.discover()
@@ -212,12 +260,20 @@ def main():
     if cfg.mode != "paper":
         sys.exit("only paper mode exists")
     tg = Telegram(os.environ["TELEGRAM_BOT_TOKEN"], os.environ["TELEGRAM_CHAT_ID"])
-    bot = Bot(cfg, tg)
+    watcher = None
+    if cfg.follow_enabled:
+        from ..helius import rpc
+        wallets = load_watchlist(cfg.wallets_path)[: cfg.follow_max_wallets]
+        if not wallets:
+            sys.exit(f"follow_enabled but no wallets in {cfg.wallets_path} (run memebot.ml.wallet_scores first)")
+        watcher = WalletWatcher(wallets, lambda m, p: rpc(m, p, pace=0.3))
+    bot = Bot(cfg, tg, watcher=watcher, find_pool=lambda mint: find_pumpswap_pool(mint, cfg.cohort_path))
     if a.once:
         bot.loop(once=True)
         print(bot.status())
         return
-    bot.say("🤖 bot started (PAPER mode)\n" + bot.status() + "\n\n" + HELP)
+    mode = f" + following {len(watcher.wallets)} wallets" if watcher else ""
+    bot.say(f"🤖 bot started (PAPER mode{mode})\n" + bot.status() + "\n\n" + HELP)
     threading.Thread(target=bot.telegram_loop, daemon=True).start()
     try:
         bot.loop()

@@ -44,3 +44,20 @@ Bot chỉ nghe lệnh từ đúng `TELEGRAM_CHAT_ID`; tin nhắn từ người k
 ## Chuyển lên VPS sau này
 Chỉ dùng thư viện chuẩn của Python nên chạy được trên Linux: đặt các biến bằng `export`, chạy
 `nohup python3 -m memebot.bot.runner > bot.log 2>&1 &` (hoặc một dịch vụ systemd).
+
+## Theo dõi ví "cá mập" (3 bước)
+1. **Thu địa chỉ:** bộ thu thập lưu top 10 holder (trừ pool) của mỗi pool lúc ghi nhận và lúc điền nến
+   (`helius_reg.top_holders`). Chỉ pool ghi nhận SAU bản cập nhật này mới có địa chỉ.
+2. **Chấm điểm và kiểm chứng** (sau ít nhất 5–7 ngày dữ liệu có địa chỉ):
+   ```
+   python -m memebot.ml.wallet_scores --data cohort.jsonl
+   ```
+   Chia theo thời gian: 60% đầu để tìm ví, 40% sau để kiểm tra. Ví giữ hơn 10% nguồn cung bị bỏ qua
+   (thường là ví dev hoặc bundle). Kết quả `PASS` hoặc `FAIL` được ghi vào `smart_wallets.json`.
+3. **Bot làm theo (paper):** chỉ bật khi bước 2 báo `PASS`. Tạo `bot_config.json`:
+   ```
+   {"follow_enabled": true, "follow_min_wallets": 1}
+   ```
+   rồi chạy lại `memebot\start_bot.bat`. Bot kiểm tra giao dịch của các ví mỗi 60 giây; khi đủ số ví cùng mua
+   một token pump.fun có pool tốt nghiệp thật, bot mua giả lập và báo "🐋 PAPER FOLLOW BUY".
+   Tốn Helius: khoảng 1 lệnh gọi mỗi ví mỗi phút, cộng 1 lệnh cho mỗi giao dịch mới của ví.
