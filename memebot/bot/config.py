@@ -23,6 +23,13 @@ class BotConfig:
     entry_window_min: float = 30.0      # ... and no later than delay + window (otherwise "missed window")
     max_top10: float = 0.5              # top-10 holders (pool excluded) share of supply
 
+    # pre-buy intelligence (RugCheck + DexScreener), checked right before buying
+    use_intel: bool = True
+    max_dev_pct: float = 0.03           # dev (creator) still holding > 3% of supply -> skip
+    block_creator_rugs: bool = True     # creator has rugged tokens before -> skip
+    max_insider_pct: float = 0.10       # insider / bundled wallets among top holders > 10% -> skip
+    max_change_h1: float = 0.8          # already +80% in the last hour -> skip (None disables)
+
     # exits
     stop_loss: float = 0.10             # grid: tight 10-15% stops won; value = what the pool would really pay
     take_profit: list = field(default_factory=list)  # [[gain, fraction of remaining], ...]; grid: none was best

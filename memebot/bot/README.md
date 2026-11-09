@@ -11,15 +11,19 @@ chỉ được thêm khi paper trading có lãi sau phí trong vài tuần.
 3. **Chờ đến khi pool được 90 phút tuổi** (`entry_delay_min`, cửa sổ 30 phút), rồi kiểm tra lại "dao rơi":
    pool còn ≥40 SOL và SOL không giảm quá 20% so với lúc ghi nhận. Đạt thì **mua giả lập** 0,05 SOL theo dự trữ
    thật lúc đó, cộng phí giao dịch cố định 0,0003 SOL mỗi lệnh (`tx_fee_sol`). Cỡ lệnh paper 0,2 SOL (`stake_sol`).
-4. **Theo dõi mỗi 15 giây** (`strategy.exit_decision`), giá trị tính bằng số SOL pool thật sự trả:
+4. **Kiểm tra trước khi mua** (`intel.py`, RugCheck + DexScreener, miễn phí): bỏ qua nếu ví dev còn giữ >3%
+   nguồn cung, dev từng rug token khác, ví insider/bundle chiếm >10%, hoặc giá đã tăng >80% trong 1 giờ.
+   Không lấy được dữ liệu RugCheck thì cũng không mua. Tin nhắn mua có giá, vốn hóa (MC), % tăng 1 giờ,
+   % dev và % insider; tin bán có giá và MC lúc vào so với lúc bán.
+5. **Theo dõi mỗi 15 giây** (`strategy.exit_decision`), giá trị tính bằng số SOL pool thật sự trả:
    cắt lỗ −10%, trailing stop 10% sau khi lãi +20%, không chốt lời cố định,
    thoát khi SOL trong pool bị rút 25% so với đỉnh, giữ tối đa 60 phút.
    Bộ quy tắc này đến từ dò tìm walk-forward trên 839 pool (TEST khoảng +3% mỗi lệnh trên 62 lệnh, chưa có ý
    nghĩa thống kê). Bot paper chính là phép thử ngoài mẫu tiếp theo.
    "Mua đuổi" (`chase_enabled`) có sẵn nhưng mặc định TẮT.
-5. **Giới hạn rủi ro:** tối đa 3 vị thế, ngừng mở lệnh mới khi lỗ trong ngày ≥0,6 SOL (nới cho paper để không cắt
+6. **Giới hạn rủi ro:** tối đa 3 vị thế, ngừng mở lệnh mới khi lỗ trong ngày ≥0,6 SOL (nới cho paper để không cắt
    ngắn phép đo; phải đặt chặt lại trước khi dùng tiền thật).
-6. Mọi quyết định (mua, bán, bỏ qua và lý do) ghi vào `bot_trades.jsonl`; trạng thái lưu ở `bot_state.json`
+7. Mọi quyết định (mua, bán, bỏ qua và lý do) ghi vào `bot_trades.jsonl`; trạng thái lưu ở `bot_state.json`
    nên khởi động lại không mất vị thế.
 
 Muốn đổi thông số: tạo file `bot_config.json` cùng thư mục, ví dụ `{"stake_sol": 0.02, "max_positions": 2}`.
@@ -75,6 +79,8 @@ python -m memebot.ml.entry_timing --data cohort.jsonl --grid
 `--grid` dò 480 cấu hình (thời điểm vào × cắt lỗ × chốt lời × trailing × thời gian giữ) theo walk-forward:
 chọn trên 60% pool cũ hơn, báo kết quả TEST trên 40% pool mới hơn. Chỉ số TEST mới có ý nghĩa.
 Mặc định tính phí cố định 0,0003 SOL mỗi giao dịch; đổi bằng `--tx-fee` và cỡ lệnh bằng `--stake`.
+`--max-h1 0.8` bỏ các lệnh mà giá đã tăng >80% trong giờ trước đó (kiểm chứng quy tắc của bot).
+Quy tắc dev/bundle chưa backtest được: bộ thu thập bắt đầu lưu `rc_reg` (RugCheck lúc ghi nhận) từ bản này.
 So sánh vào lệnh sau 5/15/30/60 phút với 3 bộ lọc (F0 mọi pool còn giao dịch, F1 + chặn dao rơi,
 F2 + lực mua), và 2 cách thoát (giữ đến lúc điền nến, hoặc theo quy tắc của bot). Kết quả tính bằng số SOL
 thật rút ra được từ pool. Một bộ lọc chỉ có ích nếu tốt hơn F0 ở cả nửa đầu lẫn nửa sau của dữ liệu.

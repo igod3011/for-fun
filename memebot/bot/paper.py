@@ -62,7 +62,7 @@ class Paper:
         return True, ""
 
     # trades --------------------------------------------------------------------------------------
-    def buy(self, row, pool_sol, pool_tok, stake, reason, add_to=None):
+    def buy(self, row, pool_sol, pool_tok, stake, reason, add_to=None, price_usd=0.0, mcap=0.0):
         tokens = amm.buy(stake, pool_sol, pool_tok, self.cfg.fee)
         stake_paid = stake + self.cfg.tx_fee_sol          # the fixed transaction fee is part of the cost
         self.balance -= stake_paid
@@ -73,9 +73,11 @@ class Paper:
             pos = add_to
         else:
             pos = Position(row["mint"], row["pool"], row.get("name", "?"), tokens, stake_paid, time.time(),
-                           pool_sol, peak_pool_sol=pool_sol)
+                           pool_sol, peak_pool_sol=pool_sol, entry_pool_tok=pool_tok,
+                           entry_price_usd=price_usd or 0.0, entry_mcap=mcap or 0.0)
             self.positions[row["mint"]] = pos
-        self.log(action="buy", mint=pos.mint, name=pos.name, sol=stake, tokens=tokens, pool_sol=pool_sol, reason=reason)
+        self.log(action="buy", mint=pos.mint, name=pos.name, sol=stake, tokens=tokens, pool_sol=pool_sol, reason=reason,
+                 price_usd=price_usd, mcap=mcap)
         self.save()
         return pos
 

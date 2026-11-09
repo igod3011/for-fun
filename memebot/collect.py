@@ -190,6 +190,12 @@ def main():
                 snap = helius_snapshot(p)
                 if snap:
                     p["helius_reg"] = snap
+                    if snap.get("pool_tokens") and is_canonical(p["mint"], snap.get("pool_sol") or 0, snap["pool_tokens"]):
+                        try:
+                            from .bot.intel import _get, parse_rugcheck
+                            p["rc_reg"] = parse_rugcheck(_get(f"https://api.rugcheck.xyz/v1/tokens/{p['mint']}/report"))
+                        except Exception as e:
+                            p["rc_reg"] = {"error": type(e).__name__}
                 f.write(json.dumps(p) + "\n")
         span = SPAN_MIN["v"]
         print(f"registered {len(pools)} pools | pages cover {span:.0f} min of new pools"

@@ -20,13 +20,17 @@ from .paper import Paper
 from .strategy import chase_check, entry_check, exit_decision
 from .review import load as load_log
 from .review import summary
+from .intel import fetch as fetch_intel
+from .intel import fmt_price, fmt_usd, intel_check
 from .telegram import HELP, Telegram, token_block
 from .wallets import WalletWatcher, load_watchlist
 
 
 class Bot:
-    def __init__(self, cfg, tg, reserves=pool_reserves, rows=recent_cohort_rows, watcher=None, find_pool=None):
+    def __init__(self, cfg, tg, reserves=pool_reserves, rows=recent_cohort_rows, watcher=None, find_pool=None,
+                 intel=None):
         self.cfg, self.tg, self.reserves, self.rows = cfg, tg, reserves, rows
+        self.intel = intel                 # callable(mint, pool) -> (rugcheck_info, dex_info); None = skip
         self.watcher, self.find_pool = watcher, find_pool
         self.follow_hits = {}            # mint -> {wallet: ts}
         self.followed = set()
@@ -82,9 +86,35 @@ class Bot:
                     self.p.log(action="skip", mint=mint, name=r.get("name"),
                                reason=f"falling knife: pool SOL {reg_sol:.0f} -> {sol:.0f} since registration")
                     continue
-                pos = self.p.buy(r, sol, tok, self.cfg.stake_sol, "entry filter passed")
-            self.say(f"🟢 PAPER BUY\n{token_block(pos.name, mint)}\n{self.cfg.stake_sol} SOL, pool {sol:.0f} SOL", html=True)
+                ok, info, price, mcap = self.check_intel(mint, r["pool"], r.get("name"))
+                if not ok:
+                    continue
+                pos = self.p.buy(r, sol, tok, self.cfg.stake_sol, "entry filter passed", price_usd=price, mcap=mcap)
+            self.say(f"🟢 PAPER BUY\n{token_block(pos.name, mint)}\n{info}{self.cfg.stake_sol} SOL, pool {sol:.0f} SOL",
+                     html=True)
         self.p.save()
+
+    def check_intel(self, mint, pool, name):
+        """RugCheck + DexScreener rules right before buying. Returns (ok, message_lines, price_usd, mcap)."""
+        if not (self.intel and self.cfg.use_intel):
+            return True, "", 0.0, 0.0
+        rc, dx = self.intel(mint, pool)
+        ok, why = intel_check(rc, dx, self.cfg)
+        if not ok:
+            self.p.log(action="skip", mint=mint, name=name, reason="; ".join(why))
+            return False, "", 0.0, 0.0
+        info = (f"Giá {fmt_price(dx['price_usd'])} | MC {fmt_usd(dx['mcap'])} | 1h {dx['change_h1']:+.0%}\n"
+                f"Dev {(rc['dev_pct'] or 0):.1%} | Insider {rc['insider_pct']:.0%}\n")
+        return True, info, dx["price_usd"], float(dx["mcap"] or 0)
+
+    @staticmethod
+    def price_line(pos, sol, tok):
+        """Entry vs current price/market cap, from the pool's real reserves (no extra API call)."""
+        if not (pos.entry_price_usd and pos.entry_pool_tok and tok):
+            return ""
+        ratio = (sol / tok) / (pos.entry_pool_sol / pos.entry_pool_tok)
+        return (f"Giá {fmt_price(pos.entry_price_usd)} → {fmt_price(pos.entry_price_usd * ratio)}"
+                f" | MC {fmt_usd(pos.entry_mcap)} → {fmt_usd(pos.entry_mcap * ratio)}\n")
 
     def manage(self):
         now = time.time()
@@ -100,8 +130,8 @@ class Bot:
                     out, pnl = self.p.sell(mint, frac, sol, tok, reason)
                     tail = f"closed, PnL {pnl:+.4f} SOL" if pnl is not None else f"sold {frac:.0%}"
                     from html import escape
-                    self.say(f"🔴 PAPER SELL: {escape(reason)}\n{token_block(pos.name, mint)}\n+{out:.4f} SOL, {tail}",
-                             html=True)
+                    self.say(f"🔴 PAPER SELL: {escape(reason)}\n{token_block(pos.name, mint)}\n"
+                             f"{self.price_line(pos, sol, tok)}+{out:.4f} SOL, {tail}", html=True)
                 elif chase_check(pos, sol, tok, now, self.cfg):
                     can, _ = self.p.can_open(0)
                     if can and self.p.balance >= self.cfg.chase_stake_sol:
@@ -143,9 +173,12 @@ class Bot:
             if not can:
                 self.p.log(action="skip", mint=mint, reason=f"follow {who}: risk gate: {why_not}")
                 return
+            ok, info, price, mcap = self.check_intel(mint, pool, mint[:6])
+            if not ok:
+                return
             pos = self.p.buy({"mint": mint, "pool": pool, "name": mint[:6]}, sol, tok, self.cfg.stake_sol,
-                             f"follow {len(wallets)} wallet(s): {who}")
-        self.say(f"🐋 PAPER FOLLOW BUY\n{token_block(pos.name, mint)}\n{len(wallets)} watched wallet(s) bought: {who}\n"
+                             f"follow {len(wallets)} wallet(s): {who}", price_usd=price, mcap=mcap)
+        self.say(f"🐋 PAPER FOLLOW BUY\n{token_block(pos.name, mint)}\n{info}{len(wallets)} watched wallet(s) bought: {who}\n"
                  f"{self.cfg.stake_sol} SOL, pool {sol:.0f} SOL", html=True)
 
     def record_series(self, mint, sol, tok, now):
@@ -186,7 +219,8 @@ class Bot:
         out = []
         for m, pos in self.p.positions.items():
             age = (time.time() - pos.opened_at) / 60
-            out.append(f"{pos.name}: cost {pos.cost_sol:.3f} SOL, peak x{pos.peak_mult:.2f}, {age:.0f} min\nCA: {m}")
+            mc = f", MC vào {fmt_usd(pos.entry_mcap)}" if pos.entry_mcap else ""
+            out.append(f"{pos.name}: cost {pos.cost_sol:.3f} SOL{mc}, peak x{pos.peak_mult:.2f}, {age:.0f} min\nCA: {m}")
         return "\n\n".join(out)
 
     def command(self, text):
@@ -290,7 +324,8 @@ def main():
         if not wallets:
             sys.exit(f"follow_enabled but no wallets in {cfg.wallets_path} (run memebot.ml.wallet_scores first)")
         watcher = WalletWatcher(wallets, rpc_call)        # standard RPC: public first, Helius fallback
-    bot = Bot(cfg, tg, watcher=watcher, find_pool=lambda mint: find_pumpswap_pool(mint, cfg.cohort_path))
+    bot = Bot(cfg, tg, watcher=watcher, find_pool=lambda mint: find_pumpswap_pool(mint, cfg.cohort_path),
+              intel=fetch_intel)
     if a.once:
         bot.loop(once=True)
         print(bot.status())

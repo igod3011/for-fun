@@ -18,6 +18,9 @@ class Position:
     tp_done: list = field(default_factory=list)
     chased: bool = False
     realized_sol: float = 0.0
+    entry_pool_tok: float = 0.0
+    entry_price_usd: float = 0.0
+    entry_mcap: float = 0.0
 
 
 def entry_check(c, cfg):

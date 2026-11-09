@@ -53,7 +53,10 @@ def setup(p):
             "conv": usd_reg / (s0 / t0), "t_fill": f.get("fetched_at") or p.get("fetched_at")}
 
 
-def entry(S, created, delay_min, guard, momentum):
+MAX_H1 = None        # skip entries already up more than this over the previous hour (e.g. 0.8); --max-h1
+
+
+def entry(S, created, delay_min, guard, momentum, max_h1=None):
     te = created + delay_min * 60
     if not S["t_fill"] or te >= S["t_fill"]:
         return None
@@ -66,6 +69,11 @@ def entry(S, created, delay_min, guard, momentum):
         return None                                       # implausible price (data glitch)
     if guard:
         if s_e < 40 or (te >= S["t_reg"] and s_e < 0.8 * S["s0"]):
+            return None
+    max_h1 = MAX_H1 if max_h1 is None else max_h1
+    if max_h1 is not None:
+        hour_ago = close_at(S["c"], te - 3600, tol=900)
+        if hour_ago and usd / hour_ago - 1 > max_h1:
             return None
     if momentum:
         prev = close_at(S["c"], te - 600, tol=300)
@@ -239,10 +247,12 @@ def main():
     ap.add_argument("--grid", action="store_true", help="walk-forward search over entry delay and exit rules")
     ap.add_argument("--tx-fee", type=float, default=0.0003, help="SOL per transaction (priority + base fee)")
     ap.add_argument("--stake", type=float, default=0.05, help="SOL per entry (bigger = less fee drag, more impact)")
+    ap.add_argument("--max-h1", type=float, default=None, help="skip entries already up more than this in the last hour (0.8 = +80%%)")
     a = ap.parse_args()
-    global TX_FEE, STAKE
-    TX_FEE, STAKE = a.tx_fee, a.stake
-    print(f"stake {STAKE} SOL, swap fee {FEE:.1%}, fixed {TX_FEE} SOL per transaction")
+    global TX_FEE, STAKE, MAX_H1
+    TX_FEE, STAKE, MAX_H1 = a.tx_fee, a.stake, a.max_h1
+    print(f"stake {STAKE} SOL, swap fee {FEE:.1%}, fixed {TX_FEE} SOL per transaction"
+          + (f", skip if already >{MAX_H1:+.0%} in 1h" if MAX_H1 is not None else ""))
     rows = [json.loads(l) for l in open(a.data, encoding="utf-8", errors="replace")]
     if a.grid:
         grid_search(rows)
