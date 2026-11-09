@@ -92,32 +92,33 @@ def top_owners(accounts, exclude_owners=(), n=10):
     return [[o, round(v / total, 5)] for o, v in ranked]
 
 
-def enrich_one(row):
+def holder_snapshot(row, max_pages=1):
+    """DAS-only part (10 credits per call): holder stats, top-10 addresses, mint/freeze authority."""
     mint = row["mint"]
-    accs = token_accounts(mint)
+    accs = token_accounts(mint, max_pages=max_pages)
     f = holder_features(accs, exclude_owners=[row.get("pool")])
     f["top_holders"] = top_owners(accs, [row.get("pool")], 10)   # addresses: lets us study "smart" wallets
     f["accounts_fetched"] = len(accs)
     try:
-        asset = rpc("getAsset", {"id": mint})
-        ti = asset.get("token_info") or {}
+        ti = rpc("getAsset", {"id": mint}).get("token_info") or {}
         f["mint_authority"] = ti.get("mint_authority")
         f["freeze_authority"] = ti.get("freeze_authority")
         f["supply_raw"] = ti.get("supply")
     except RuntimeError as e:
         f["asset_error"] = str(e)[:120]
-    try:   # real pool reserves: SOL = liquidity side, tokens = inventory side. A rug empties both.
-        for key, m in (("pool_sol", WSOL), ("pool_tokens", mint)):
-            v = rpc("getTokenAccountsByOwner", [row["pool"], {"mint": m}, {"encoding": "jsonParsed"}])
-            f[key] = sum(float(x["account"]["data"]["parsed"]["info"]["tokenAmount"]["uiAmount"] or 0)
-                         for x in v.get("value", []))
+    return f
+
+
+def enrich_one(row):
+    """Full snapshot: free reserves (public RPC) + DAS holder data."""
+    from .rpc import pool_reserves
+    f = holder_snapshot(row, max_pages=3)
+    try:
+        f["pool_sol"], f["pool_tokens"] = pool_reserves(row["pool"], row["mint"])
     except (RuntimeError, KeyError, TypeError) as e:
         f["pool_error"] = str(e)[:120]
     f["fetched_at"] = int(time.time())
     return f
-
-
-SYSTEM_PROGRAM = "11111111111111111111111111111111"
 
 
 def owner_kind(addr):

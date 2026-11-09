@@ -29,14 +29,9 @@ def recent_cohort_rows(path, max_age_s=1800, tail_bytes=2_000_000):
 
 
 def pool_reserves(pool, mint):
-    """(pool_sol, pool_tokens) from the pool's own token accounts, via Helius RPC."""
-    from ..helius import rpc
-    res = []
-    for m in (WSOL, mint):
-        v = rpc("getTokenAccountsByOwner", [pool, {"mint": m}, {"encoding": "jsonParsed"}], pace=0.3)
-        res.append(sum(float(x["account"]["data"]["parsed"]["info"]["tokenAmount"]["uiAmount"] or 0)
-                       for x in v.get("value", [])))
-    return res[0], res[1]
+    """(pool_sol, pool_tokens); free public RPC first, Helius only as fallback."""
+    from ..rpc import pool_reserves as _pr
+    return _pr(pool, mint)
 
 
 def find_pumpswap_pool(mint, cohort_path, max_age_s=3 * 86400):

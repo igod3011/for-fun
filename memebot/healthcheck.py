@@ -82,17 +82,21 @@ def main():
                         + ("never" if last is None else f"{last:.0f} min ago") + "  -> fill may be failing")
         else:
             out("PASS", f"fill OK: {len(fetched)} pools have candles; {len(waiting_old)} overdue")
-        # 5) helius
+        # 5) snapshots: reserves (free public RPC) for every pool; Helius holder data only for canonical pools
         recent = [r for r in rows if r.get("registered_at") and _age_min(r["registered_at"]) < 45]
         if recent:
-            ok = [r for r in recent if r.get("helius_reg") and "error" not in r["helius_reg"]]
-            errs = [r["helius_reg"]["error"] for r in recent if r.get("helius_reg", {}).get("error")]
-            if ok:
-                out("PASS", f"Helius snapshots working ({len(ok)}/{len(recent)} recent pools)")
+            res = [r for r in recent if (r.get("helius_reg") or {}).get("pool_sol") is not None]
+            out("PASS" if res else "FAIL", f"reserve snapshots (free RPC): {len(res)}/{len(recent)} recent pools")
+            canon = [r for r in res if r["mint"].endswith("pump") and r["helius_reg"].get("pool_tokens")
+                     and 0.5e10 <= r["helius_reg"]["pool_sol"] * r["helius_reg"]["pool_tokens"] <= 5e10]
+            holders = [r for r in canon if r["helius_reg"].get("top_holders") is not None]
+            errs = [r["helius_reg"]["holders_error"] for r in canon if r["helius_reg"].get("holders_error")]
+            if canon and holders:
+                out("PASS", f"Helius holder data on canonical pools: {len(holders)}/{len(canon)}")
             elif errs:
-                out("FAIL", f"Helius errors on recent pools: {errs[-1]}")
-            else:
-                out("WARN", "recent pools have NO Helius snapshot -> daemon started without HELIUS_API_KEY "
+                out("FAIL", f"Helius holder errors: {errs[-1]}")
+            elif canon:
+                out("WARN", "canonical pools have NO holder data -> daemon started without HELIUS_API_KEY "
                             "(set the key in this window, then run memebot\\restart_collector.bat)")
     else:
         out("FAIL", f"{a.data} not found")

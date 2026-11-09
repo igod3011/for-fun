@@ -98,15 +98,27 @@ def rugcheck(mint):
             "creator": rep.get("creator"), "total_holders": rep.get("totalHolders")}
 
 
-def helius_snapshot(p):
-    """Pool/holder snapshot via Helius if HELIUS_API_KEY is set; never raises."""
-    if not os.environ.get("HELIUS_API_KEY"):
-        return None
+def is_canonical(mint, sol, tok):
+    """Loose check for a real pump.fun graduation pool (k = SOL*tokens ~ 1-2.6e10; window kept wider here)."""
+    return mint.endswith("pump") and sol >= 1 and 0.5e10 <= sol * tok <= 5e10
+
+
+def helius_snapshot(p, with_holders=True):
+    """Reserves for every pool via the FREE public RPC; Helius DAS holder data (10 credits/call) only for
+    canonical pump.fun pools, and only at registration. Never raises."""
+    from .rpc import pool_reserves
     try:
-        from .helius import enrich_one
-        return enrich_one(p)
-    except BaseException as e:      # SystemExit from a missing key, network errors, ...
+        sol, tok = pool_reserves(p["pool"], p["mint"])
+    except BaseException as e:
         return {"error": str(e)[:120]}
+    snap = {"pool_sol": sol, "pool_tokens": tok, "fetched_at": int(time.time())}
+    if with_holders and os.environ.get("HELIUS_API_KEY") and is_canonical(p["mint"], sol, tok):
+        try:
+            from .helius import holder_snapshot
+            snap.update(holder_snapshot(p, max_pages=1))
+        except BaseException as e:
+            snap["holders_error"] = str(e)[:120]
+    return snap
 
 
 def _save(path, rows):
@@ -129,7 +141,7 @@ def fill(path, min_age_h, max_fill=10):
             o = get(f"{GT}/pools/{p['pool']}/ohlcv/minute?aggregate=1&limit=1000&currency=usd")
             p["candles"] = sorted(o["data"]["attributes"]["ohlcv_list"]) if o else []   # keep empty: dead pools count!
             p["rugcheck"] = rugcheck(p["mint"])
-            snap = helius_snapshot(p)
+            snap = helius_snapshot(p, with_holders=False)      # outcome only needs reserves (free)
             if snap:
                 p["helius_fill"] = snap
             p["fetched_at"] = int(time.time())

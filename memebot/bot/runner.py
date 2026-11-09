@@ -262,11 +262,11 @@ def main():
     tg = Telegram(os.environ["TELEGRAM_BOT_TOKEN"], os.environ["TELEGRAM_CHAT_ID"])
     watcher = None
     if cfg.follow_enabled:
-        from ..helius import rpc
+        from ..rpc import call as rpc_call
         wallets = load_watchlist(cfg.wallets_path)[: cfg.follow_max_wallets]
         if not wallets:
             sys.exit(f"follow_enabled but no wallets in {cfg.wallets_path} (run memebot.ml.wallet_scores first)")
-        watcher = WalletWatcher(wallets, lambda m, p: rpc(m, p, pace=0.3))
+        watcher = WalletWatcher(wallets, rpc_call)        # standard RPC: public first, Helius fallback
     bot = Bot(cfg, tg, watcher=watcher, find_pool=lambda mint: find_pumpswap_pool(mint, cfg.cohort_path))
     if a.once:
         bot.loop(once=True)
