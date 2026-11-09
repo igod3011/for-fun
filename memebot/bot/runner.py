@@ -65,6 +65,11 @@ class Bot:
                 if sol < self.cfg.min_pool_sol:
                     self.p.log(action="skip", mint=mint, name=r.get("name"), reason=f"pool now {sol:.1f} SOL")
                     continue
+                reg_sol = (r.get("helius_reg") or {}).get("pool_sol") or 0
+                if reg_sol and sol < (1 - self.cfg.max_drop_since_reg) * reg_sol:
+                    self.p.log(action="skip", mint=mint, name=r.get("name"),
+                               reason=f"falling knife: pool SOL {reg_sol:.0f} -> {sol:.0f} since registration")
+                    continue
                 pos = self.p.buy(r, sol, tok, self.cfg.stake_sol, "entry filter passed")
             self.say(f"🟢 PAPER BUY\n{token_block(pos.name, mint)}\n{self.cfg.stake_sol} SOL, pool {sol:.0f} SOL", html=True)
         self.p.save()

@@ -13,7 +13,8 @@ class BotConfig:
     fee: float = 0.005                  # per swap (pool fee + priority fee approx)
 
     # entry filter (placeholder until the 2-week analysis decides better rules)
-    min_pool_sol: float = 20.0
+    min_pool_sol: float = 40.0          # graduation pools start ~60-85 SOL; half the SOL = price down ~75%
+    max_drop_since_reg: float = 0.2     # skip if pool SOL fell >20% between registration and our buy ("falling knife")
     k_min: float = 1.0e10               # canonical pump.fun graduation pool: SOL*tokens ~ 1-2.6e10
     k_max: float = 2.6e10
     max_age_min: float = 15.0           # only pools registered within this many minutes of creation

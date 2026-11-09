@@ -61,3 +61,11 @@ Chỉ dùng thư viện chuẩn của Python nên chạy được trên Linux: �
    rồi chạy lại `memebot\start_bot.bat`. Bot kiểm tra giao dịch của các ví mỗi 60 giây; khi đủ số ví cùng mua
    một token pump.fun có pool tốt nghiệp thật, bot mua giả lập và báo "🐋 PAPER FOLLOW BUY".
    Tốn Helius: khoảng 1 lệnh gọi mỗi ví mỗi phút, cộng 1 lệnh cho mỗi giao dịch mới của ví.
+
+## Chọn thời điểm vào lệnh (backtest trên dữ liệu thật)
+```
+python -m memebot.ml.entry_timing --data cohort.jsonl
+```
+So sánh vào lệnh sau 5/15/30/60 phút với 3 bộ lọc (F0 mọi pool còn giao dịch, F1 + chặn dao rơi,
+F2 + lực mua), và 2 cách thoát (giữ đến lúc điền nến, hoặc theo quy tắc của bot). Kết quả tính bằng số SOL
+thật rút ra được từ pool. Một bộ lọc chỉ có ích nếu tốt hơn F0 ở cả nửa đầu lẫn nửa sau của dữ liệu.

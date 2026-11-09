@@ -164,6 +164,17 @@ class BotTests(unittest.TestCase):
         self.assertEqual(self.bot.p.positions, {})
         self.assertIn("stopping", msg)
 
+    def test_falling_knife_and_low_liquidity_are_skipped(self):
+        self.res.update(sol=60.0, tok=2.07e8 * 85 / 60)        # registered at 85 SOL, now 60: -29% SOL
+        self.bot.discover()
+        self.assertEqual(self.bot.p.positions, {})
+        log = open(self.bot.cfg.log_path).read()
+        self.assertIn("falling knife", log)
+        self.rows.append(row("Dddpump", sol=35, tok=2.07e8 * 85 / 35))   # under 40 SOL at registration
+        self.res.update(sol=35.0, tok=2.07e8 * 85 / 35)
+        self.bot.discover()
+        self.assertEqual(self.bot.p.positions, {})
+
     def test_daily_loss_limit(self):
         self.bot.p.day_pnl = -0.25
         self.bot.discover()
