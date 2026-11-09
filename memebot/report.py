@@ -22,20 +22,76 @@ def main(path):
     if both:
         drained = [p for p in both if p["helius_fill"]["pool_sol"] < 0.2 * p["helius_reg"]["pool_sol"]]
         print(f"Helius snapshots at registration AND fill: {len(both)} pools; "
-              f"pool SOL fell >80% (likely liquidity pulled / rug): {len(drained)} ({len(drained)/len(both):.0%})")
+              f"pool SOL fell >80% (liquidity pulled OR dumped; either way holders lose ~96%+): {len(drained)} ({len(drained)/len(both):.0%})")
     if filled:
         print(f"dead/illiquid: {len(filled) - len(live)}/{len(filled)} filled pools ({(len(filled) - len(live)) / len(filled):.0%}) "
               f"traded in fewer than 30 minutes of their first 3h+ -> most graduated memecoins die almost immediately")
-    if live:
-        import statistics as st
-        # entry = open of the 6th trading minute; exit = close of the last candle. Uses ONLY pools that stayed
-        # alive (survivorship bias!) and raw GeckoTerminal prices (first candle can be a bogus pool-init price),
-        # so read the median/quartiles only; the mean is dominated by outliers and is deliberately not printed.
-        r = sorted(p["candles"][-1][4] / sorted(p["candles"])[5][1] - 1 for p in live if len(p["candles"]) > 6)
-        if len(r) >= 4:
-            q = st.quantiles(r, n=4)
-            print(f"naive buy@candle6 -> last close, SURVIVORS ONLY, no costs: n={len(r)} "
-                  f"quartiles {q[0]:+.0%} / {q[1]:+.0%} / {q[2]:+.0%}, share>0 {sum(x > 0 for x in r)/len(r):.0%}")
+    if filled:
+        cohort_baseline(filled)
+        realizable_baseline(rows)
+
+
+def fixed_horizon_return(p, entry_delay_s=300, horizon_s=3 * 3600):
+    """Buy at the open of the first candle >= created+5min, sell at the close of the last candle
+    <= created+3h. Returns None if nothing traded in that window (no entry possible).
+    Every pool that traded counts, dead or alive: no survivorship bias."""
+    c = sorted(p.get("candles") or [])
+    t0 = p["created"]
+    window = [x for x in c if t0 + entry_delay_s <= x[0] <= t0 + horizon_s]
+    if not window or window[0][1] <= 0:
+        return None
+    return window[-1][4] / window[0][1] - 1
+
+
+def cohort_baseline(filled, cost=0.02):
+    import statistics as st
+    r = [x for x in (fixed_horizon_return(p) for p in filled) if x is not None]
+    if len(r) < 4:
+        return
+    net = [(1 + x) * (1 - cost) - 1 for x in r]
+    q = st.quantiles(net, n=4)
+    print(f"[PRICE-BASED, UNRELIABLE: last trade price ignores whether exit liquidity still exists; drained pools "
+          f"show absurd prices] buy 5min after migration, hold 3h, ALL pools that traded, "
+          f"~{cost:.0%} round-trip cost: n={len(r)} of {len(filled)} filled "
+          f"({len(filled) - len(r)} had no trade to enter)")
+    print(f"   quartiles {q[0]:+.0%} / {q[1]:+.0%} / {q[2]:+.0%}; share>0 {sum(x > 0 for x in net)/len(net):.0%}; "
+          f"share<-50% {sum(x < -0.5 for x in net)/len(net):.0%}; share>+100% {sum(x > 1 for x in net)/len(net):.0%}")
+    eq = 1.0
+    for x in net:          # equal stake on each pool: mean of returns, capped at +10x so one bogus candle can't dominate
+        eq += min(x, 10) / len(net)
+    print(f"   equal-stake average (gains capped at +1000%): {eq - 1:+.1%} per trade"
+          f"  -> {'NEGATIVE: no edge' if eq < 1 else 'positive: check robustness before believing it'}")
+
+
+def realizable_return(p, stake_sol=0.1, fee=0.01):
+    """SOL you could actually get back. Buy `stake_sol` at the pool's spot price at registration
+    (Helius reserves, minutes after migration), sell everything into the pool's REAL reserves at fill
+    time (constant product: out = sol * q / (tokens + q)). A drained pool returns ~0 whatever its last
+    trade price was. Returns None if a snapshot is missing/invalid."""
+    r, f = p.get("helius_reg") or {}, p.get("helius_fill") or {}
+    s0, t0 = r.get("pool_sol"), r.get("pool_tokens")
+    s1, t1 = f.get("pool_sol"), f.get("pool_tokens")
+    if not s0 or not t0 or s1 is None or t1 is None:
+        return None
+    q = stake_sol * (1 - fee / 2) * t0 / (s0 + stake_sol)     # tokens bought (with price impact)
+    out = s1 * q / (t1 + q) * (1 - fee / 2)                   # SOL received selling into the real pool
+    return out / stake_sol - 1
+
+
+def realizable_baseline(rows):
+    import statistics as st
+    r = [x for x in (realizable_return(p) for p in rows) if x is not None]
+    if len(r) < 4:
+        print("REALIZABLE baseline: needs pools with Helius snapshots at registration AND fill")
+        return
+    q = st.quantiles(r, n=4)
+    capped = sum(min(x, 10) for x in r) / len(r)
+    print(f"REALIZABLE (Helius pool reserves; buy 0.1 SOL at registration, sell into real pool at fill, ~1% fees): n={len(r)}")
+    print(f"   quartiles {q[0]:+.0%} / {q[1]:+.0%} / {q[2]:+.0%}; share>0 {sum(x > 0 for x in r)/len(r):.0%}; "
+          f"share<-50% {sum(x < -0.5 for x in r)/len(r):.0%}; share>+100% {sum(x > 1 for x in r)/len(r):.0%}")
+    print(f"   equal-stake average (gains capped at +1000%): {capped:+.1%} per trade"
+          f"  -> {'NEGATIVE: no edge from blind entry' if capped < 0 else 'positive: verify before believing'}")
+
 
 if __name__ == "__main__":
     main(sys.argv[1])
