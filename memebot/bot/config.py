@@ -7,9 +7,9 @@ from dataclasses import asdict, dataclass, field
 class BotConfig:
     mode: str = "paper"                 # only "paper" exists; real execution is not implemented on purpose
     paper_balance_sol: float = 1.0
-    stake_sol: float = 0.05             # SOL per entry
+    stake_sol: float = 0.2              # SOL per entry; grid: 0.2 beat 0.05 (fixed tx fee 0.3% vs 1.2% per round trip)
     max_positions: int = 3
-    max_daily_loss_sol: float = 0.2     # no new entries once today's realized loss reaches this
+    max_daily_loss_sol: float = 0.6     # PAPER: loose so measurement is not cut short; set tight before real money
     fee: float = 0.005                  # per swap, proportional (pool fee)
     tx_fee_sol: float = 0.0003          # per transaction, fixed (priority + base fee)
 

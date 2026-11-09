@@ -118,7 +118,7 @@ class BotTests(unittest.TestCase):
         self.bot.discover()
         self.bot.discover()
         self.assertEqual(list(self.bot.p.positions), ["Aaapump"])
-        self.assertAlmostEqual(self.bot.p.balance, 1 - 0.05 - 0.0003)        # stake + fixed tx fee
+        self.assertAlmostEqual(self.bot.p.balance, 1 - 0.2 - 0.0003)         # stake + fixed tx fee
 
     def test_rug_drain_closes_position_and_reports(self):
         self.bot.discover()
@@ -207,7 +207,7 @@ class BotTests(unittest.TestCase):
         self.assertIn("Youngpump", self.bot.p.positions)
 
     def test_daily_loss_limit(self):
-        self.bot.p.day_pnl = -0.25
+        self.bot.p.day_pnl = -0.65
         self.bot.discover()
         self.assertEqual(self.bot.p.positions, {})
 
