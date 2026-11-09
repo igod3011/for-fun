@@ -115,7 +115,7 @@ def helius_snapshot(p, with_holders=True):
     if with_holders and os.environ.get("HELIUS_API_KEY") and is_canonical(p["mint"], sol, tok):
         try:
             from .helius import holder_snapshot
-            snap.update(holder_snapshot(p, max_pages=1))
+            snap.update(holder_snapshot(p, max_pages=3))   # stops after page 1 when < 1000 accounts
         except BaseException as e:
             snap["holders_error"] = str(e)[:120]
     return snap

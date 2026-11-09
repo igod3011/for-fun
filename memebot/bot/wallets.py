@@ -41,7 +41,7 @@ class WalletWatcher:
         """Returns [(wallet, mint)] for buys seen since the previous poll. First poll only sets the baseline."""
         signals = []
         for w in self.wallets:
-            sigs = self.rpc("getSignaturesForAddress", [w, {"limit": 10}]) or []
+            sigs = self.rpc("getSignaturesForAddress", [w, {"limit": 10, "commitment": "confirmed"}]) or []
             if not sigs:
                 continue
             newest = sigs[0]["signature"]
@@ -56,6 +56,7 @@ class WalletWatcher:
                     fresh.append(s["signature"])
             self.last_sig[w] = newest
             for sig in reversed(fresh):
-                tx = self.rpc("getTransaction", [sig, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0}])
+                tx = self.rpc("getTransaction", [sig, {"encoding": "jsonParsed", "maxSupportedTransactionVersion": 0,
+                                                       "commitment": "confirmed"}])
                 signals += [(w, m) for m in buys_in_tx(tx, w)]
         return signals

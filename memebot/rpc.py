@@ -44,10 +44,11 @@ def call(method, params, _public=public_rpc, _helius=None):
 
 
 def pool_reserves(pool, mint, _call=call):
-    """(SOL, tokens) held by the AMM pool's own token accounts."""
+    """(SOL, tokens) held by the AMM pool's own token accounts. "confirmed" ~1-2 s behind vs ~13 s for the
+    default "finalized", so dumps and liquidity pulls are seen sooner."""
     res = []
     for m in (WSOL, mint):
-        v = _call("getTokenAccountsByOwner", [pool, {"mint": m}, {"encoding": "jsonParsed"}])
+        v = _call("getTokenAccountsByOwner", [pool, {"mint": m}, {"encoding": "jsonParsed", "commitment": "confirmed"}])
         res.append(sum(float(x["account"]["data"]["parsed"]["info"]["tokenAmount"]["uiAmount"] or 0)
                        for x in (v or {}).get("value", [])))
     return res[0], res[1]
