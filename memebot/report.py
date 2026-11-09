@@ -78,20 +78,32 @@ def realizable_return(p, stake_sol=0.1, fee=0.01):
     return out / stake_sol - 1
 
 
-def realizable_baseline(rows):
+def realizable_baseline(rows, min_entry_sol=20.0):
+    """Only pools you could actually have bought into: >= min_entry_sol SOL in the pool at registration.
+    PumpSwap is permissionless, so the cohort mixes real pump.fun graduates (mint ends with 'pump')
+    with pools created directly on PumpSwap; they are reported separately."""
     import statistics as st
-    r = [x for x in (realizable_return(p) for p in rows) if x is not None]
-    if len(r) < 4:
+    snap = [p for p in rows if (p.get("helius_reg") or {}).get("pool_sol") is not None and p.get("helius_fill")]
+    if not snap:
         print("REALIZABLE baseline: needs pools with Helius snapshots at registration AND fill")
         return
-    q = st.quantiles(r, n=4)
-    capped = sum(min(x, 10) for x in r) / len(r)
-    print(f"REALIZABLE (Helius pool reserves; buy 0.1 SOL at registration, sell into real pool at fill, ~1% fees): n={len(r)}")
-    print(f"   quartiles {q[0]:+.0%} / {q[1]:+.0%} / {q[2]:+.0%}; share>0 {sum(x > 0 for x in r)/len(r):.0%}; "
-          f"share<-50% {sum(x < -0.5 for x in r)/len(r):.0%}; share>+100% {sum(x > 1 for x in r)/len(r):.0%}")
-    print(f"   equal-stake average (gains capped at +1000%): {capped:+.1%} per trade"
-          f"  -> {'NEGATIVE: no edge from blind entry' if capped < 0 else 'positive: verify before believing'}")
-
+    empty = [p for p in snap if (p["helius_reg"]["pool_sol"] or 0) < 1]
+    thin = [p for p in snap if 1 <= (p["helius_reg"]["pool_sol"] or 0) < min_entry_sol]
+    print(f"REALIZABLE (Helius reserves; buy 0.1 SOL at registration, sell into the REAL pool at fill, ~1% fees)")
+    print(f"   {len(snap)} pools with both snapshots: {len(empty)} ({len(empty)/len(snap):.0%}) were ALREADY EMPTY (<1 SOL) "
+          f"minutes after creation (untradable), {len(thin)} thin (<{min_entry_sol:.0f} SOL) excluded")
+    tradable = [p for p in snap if (p["helius_reg"]["pool_sol"] or 0) >= min_entry_sol]
+    for label, grp in (("pump.fun graduates (mint ...pump)", [p for p in tradable if p["mint"].endswith("pump")]),
+                       ("other PumpSwap pools", [p for p in tradable if not p["mint"].endswith("pump")])):
+        r = [x for x in (realizable_return(p) for p in grp) if x is not None]
+        if len(r) < 4:
+            print(f"   {label}: n={len(r)} (too few)")
+            continue
+        q = st.quantiles(r, n=4)
+        avg = sum(min(x, 10) for x in r) / len(r)
+        print(f"   {label}: n={len(r)} quartiles {q[0]:+.0%} / {q[1]:+.0%} / {q[2]:+.0%}; share>0 {sum(x > 0 for x in r)/len(r):.0%}; "
+              f"share<-50% {sum(x < -0.5 for x in r)/len(r):.0%}; avg (cap +1000%) {avg:+.1%}"
+              f" -> {'NEGATIVE' if avg < 0 else 'positive, verify'}")
 
 if __name__ == "__main__":
     main(sys.argv[1])
