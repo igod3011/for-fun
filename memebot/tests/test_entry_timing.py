@@ -104,3 +104,17 @@ class ExitFidelityTest(unittest.TestCase):
         self.assertTrue(any("TOP 5 BY TRAIN" in l for l in lines))
         self.assertTrue(any("TEST" in l for l in lines))
         self.assertLess(time.time() - t, 240)
+
+
+class TxFeeTest(unittest.TestCase):
+    def test_fixed_fee_costs_two_transactions_per_round_trip(self):
+        S = et.setup(pool(flat))
+        te, usd, s_e, t_e = et.entry(S, T0, 15, guard=False, momentum=False)
+        q = et.amm.buy(et.STAKE, s_e, t_e, et.FEE)
+        base = et.exit_hold(S, q)
+        try:
+            et.TX_FEE = 0.0003
+            with_fee = et.exit_hold(S, q) - et.TX_FEE              # sell tx inside, buy tx at the caller
+        finally:
+            et.TX_FEE = 0.0
+        self.assertAlmostEqual((base - with_fee) / et.STAKE, 2 * 0.0003 / 0.05, places=6)   # 1.2% at 0.05 SOL

@@ -8,12 +8,14 @@ chỉ được thêm khi paper trading có lãi sau phí trong vài tuần.
 2. **Bộ lọc vào lệnh** (`strategy.entry_check`): mint pump.fun, pool tốt nghiệp thật (k = SOL×token trong
    1,0–2,6×10¹⁰), ≥20 SOL, không còn mint/freeze authority, top 10 holder ≤50%, đăng ký ≤15 phút sau khi tạo.
    Đây là bộ lọc tạm thời; quy tắc tốt hơn sẽ đến từ phân tích dữ liệu 2 tuần.
-3. **Chờ đến khi pool được 60 phút tuổi** (`entry_delay_min`, cửa sổ 30 phút), rồi kiểm tra lại "dao rơi":
+3. **Chờ đến khi pool được 90 phút tuổi** (`entry_delay_min`, cửa sổ 30 phút), rồi kiểm tra lại "dao rơi":
    pool còn ≥40 SOL và SOL không giảm quá 20% so với lúc ghi nhận. Đạt thì **mua giả lập** 0,05 SOL theo dự trữ
-   thật lúc đó. Backtest trên 836 pool cho thấy vào sau ~60 phút kèm bộ chặn này lỗ ít nhất (vẫn âm khoảng 4,5%).
+   thật lúc đó, cộng phí giao dịch cố định 0,0003 SOL mỗi lệnh (`tx_fee_sol`).
 4. **Theo dõi mỗi 15 giây** (`strategy.exit_decision`), giá trị tính bằng số SOL pool thật sự trả:
-   cắt lỗ −25%, trailing stop 20% sau khi lãi +30%, chốt lời từng phần ở +50% và +100%,
-   thoát khi SOL trong pool bị rút 25% so với đỉnh, giữ tối đa 120 phút.
+   cắt lỗ −10%, trailing stop 10% sau khi lãi +20%, không chốt lời cố định,
+   thoát khi SOL trong pool bị rút 25% so với đỉnh, giữ tối đa 60 phút.
+   Bộ quy tắc này đến từ dò tìm walk-forward trên 839 pool (TEST khoảng +3% mỗi lệnh trên 62 lệnh, chưa có ý
+   nghĩa thống kê). Bot paper chính là phép thử ngoài mẫu tiếp theo.
    "Mua đuổi" (`chase_enabled`) có sẵn nhưng mặc định TẮT.
 5. **Giới hạn rủi ro:** tối đa 3 vị thế, ngừng mở lệnh mới khi lỗ trong ngày ≥0,2 SOL.
 6. Mọi quyết định (mua, bán, bỏ qua và lý do) ghi vào `bot_trades.jsonl`; trạng thái lưu ở `bot_state.json`
@@ -71,6 +73,7 @@ python -m memebot.ml.entry_timing --data cohort.jsonl --grid
 ```
 `--grid` dò 480 cấu hình (thời điểm vào × cắt lỗ × chốt lời × trailing × thời gian giữ) theo walk-forward:
 chọn trên 60% pool cũ hơn, báo kết quả TEST trên 40% pool mới hơn. Chỉ số TEST mới có ý nghĩa.
+Mặc định tính phí cố định 0,0003 SOL mỗi giao dịch; đổi bằng `--tx-fee` và cỡ lệnh bằng `--stake`.
 So sánh vào lệnh sau 5/15/30/60 phút với 3 bộ lọc (F0 mọi pool còn giao dịch, F1 + chặn dao rơi,
 F2 + lực mua), và 2 cách thoát (giữ đến lúc điền nến, hoặc theo quy tắc của bot). Kết quả tính bằng số SOL
 thật rút ra được từ pool. Một bộ lọc chỉ có ích nếu tốt hơn F0 ở cả nửa đầu lẫn nửa sau của dữ liệu.

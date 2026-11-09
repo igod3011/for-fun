@@ -109,7 +109,7 @@ class FollowBotTest(unittest.TestCase):
         self.assertTrue(any("FOLLOW BUY" in m for m in self.tg.sent))
         self.w.queue = [("W3", "Xpump")]                            # no double entry
         self.bot.follow_step()
-        self.assertAlmostEqual(self.bot.p.balance, 0.95)
+        self.assertAlmostEqual(self.bot.p.balance, 1 - 0.05 - 0.0003)
 
 
 if __name__ == "__main__":

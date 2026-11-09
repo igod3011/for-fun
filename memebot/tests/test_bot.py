@@ -43,7 +43,9 @@ class EntryTests(unittest.TestCase):
 
 
 class ExitTests(unittest.TestCase):
-    cfg = BotConfig()
+    # mechanics are tested with the old rule set (it exercises partial take-profits); new defaults tested below
+    cfg = replace(BotConfig(), stop_loss=0.25, take_profit=[[0.5, 0.5], [1.0, 0.5]], trail_activate=0.3, trail=0.2,
+                  max_hold_min=120.0)
 
     def pos(self):
         return Position("M", "P", "n", tokens=1.2e5, cost_sol=0.05, opened_at=NOW, entry_pool_sol=85, peak_pool_sol=85)
@@ -71,6 +73,17 @@ class ExitTests(unittest.TestCase):
         frac, why = exit_decision(p, 85 * 0.95, 2.07e8 / 0.95, NOW, self.cfg)    # falls back hard -> trailing
         self.assertEqual(frac, 1.0)
         self.assertIn("trailing", why)
+
+    def test_new_default_rules_tight_stop_and_trailing(self):
+        cfg = BotConfig()
+        self.assertEqual((cfg.entry_delay_min, cfg.stop_loss, cfg.take_profit, cfg.max_hold_min), (90.0, 0.10, [], 60.0))
+        p = self.pos()
+        frac, why = exit_decision(p, 85 * 0.94, 2.07e8 / 0.94, NOW, cfg)           # price -12%
+        self.assertEqual((frac, why.startswith("stop loss")), (1.0, True))
+        p = self.pos()
+        self.assertEqual(exit_decision(p, 85 * 1.12, 2.07e8 / 1.12, NOW, cfg)[0], 0.0)   # +25%: arm trailing
+        frac, why = exit_decision(p, 85 * 1.04, 2.07e8 / 1.04, NOW, cfg)                 # back to ~+8%
+        self.assertEqual((frac, "trailing" in why), (1.0, True))
 
     def test_max_hold(self):
         frac, why = exit_decision(self.pos(), 85, 2.07e8, NOW + 3 * 3600, self.cfg)
@@ -105,7 +118,7 @@ class BotTests(unittest.TestCase):
         self.bot.discover()
         self.bot.discover()
         self.assertEqual(list(self.bot.p.positions), ["Aaapump"])
-        self.assertAlmostEqual(self.bot.p.balance, 0.95)
+        self.assertAlmostEqual(self.bot.p.balance, 1 - 0.05 - 0.0003)        # stake + fixed tx fee
 
     def test_rug_drain_closes_position_and_reports(self):
         self.bot.discover()

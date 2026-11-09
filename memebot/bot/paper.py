@@ -49,6 +49,7 @@ class Paper:
             self.day, self.day_pnl = today, 0.0
 
     def can_open(self, stake):
+        stake += self.cfg.tx_fee_sol
         self.roll_day()
         if self.paused:
             return False, "paused"
@@ -63,14 +64,15 @@ class Paper:
     # trades --------------------------------------------------------------------------------------
     def buy(self, row, pool_sol, pool_tok, stake, reason, add_to=None):
         tokens = amm.buy(stake, pool_sol, pool_tok, self.cfg.fee)
-        self.balance -= stake
+        stake_paid = stake + self.cfg.tx_fee_sol          # the fixed transaction fee is part of the cost
+        self.balance -= stake_paid
         if add_to:
             add_to.tokens += tokens
-            add_to.cost_sol += stake
+            add_to.cost_sol += stake_paid
             add_to.chased = True
             pos = add_to
         else:
-            pos = Position(row["mint"], row["pool"], row.get("name", "?"), tokens, stake, time.time(),
+            pos = Position(row["mint"], row["pool"], row.get("name", "?"), tokens, stake_paid, time.time(),
                            pool_sol, peak_pool_sol=pool_sol)
             self.positions[row["mint"]] = pos
         self.log(action="buy", mint=pos.mint, name=pos.name, sol=stake, tokens=tokens, pool_sol=pool_sol, reason=reason)
@@ -81,6 +83,7 @@ class Paper:
         pos = self.positions[mint]
         q = pos.tokens * min(max(fraction, 0), 1)
         out = amm.sell(q, pool_sol, pool_tok, self.cfg.fee) if pool_tok > 0 else 0.0
+        out = max(out - self.cfg.tx_fee_sol, 0.0)         # fixed fee per sell transaction
         pos.tokens -= q
         pos.realized_sol += out
         self.balance += out
