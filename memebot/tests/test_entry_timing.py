@@ -122,10 +122,8 @@ class TxFeeTest(unittest.TestCase):
 
 class BootstrapTest(unittest.TestCase):
     def test_ci_contains_zero_for_noise_and_not_for_clear_edge(self):
-        import random
-        rng = random.Random(3)
-        noise = [rng.gauss(0.0, 0.25) for _ in range(60)]
-        edge = [rng.gauss(0.2, 0.05) for _ in range(60)]
+        noise = [0.25, -0.25, 0.1, -0.1] * 15                 # mean exactly 0: CI must straddle 0
+        edge = [0.15, 0.25, 0.2, 0.18] * 15                    # clearly positive
         lo, hi = et.bootstrap_ci(noise)
         self.assertTrue(lo < 0 < hi)
         lo, hi = et.bootstrap_ci(edge)
