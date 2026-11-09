@@ -80,7 +80,7 @@ class FakeTG:
     def __init__(self):
         self.sent, self.inbox, self.chat_id = [], [], "42"
 
-    def send(self, text):
+    def send(self, text, html=False):
         self.sent.append(text)
 
     def poll(self):
@@ -136,6 +136,27 @@ class BotTests(unittest.TestCase):
         self.assertIn("stop loss", text)
         self.assertIn("top skip reasons", text)
 
+    def test_buy_and_sell_messages_carry_copyable_ca(self):
+        self.bot.discover()
+        self.res.update(sol=10.0, tok=2.07e8 * 85 / 10)
+        self.bot.manage()
+        buy = next(m for m in self.tg.sent if "PAPER BUY" in m)
+        sell = next(m for m in self.tg.sent if "PAPER SELL" in m)
+        for msg in (buy, sell):
+            self.assertIn("CA: <code>Aaapump</code>", msg)
+            self.assertIn("dexscreener.com/solana/Aaapump", msg)
+
+    def test_html_failure_falls_back_to_plain_text(self):
+        class Picky(FakeTG):
+            def send(self, text, html=False):
+                if html:
+                    raise RuntimeError("telegram sendMessage: HTTP 400")
+                self.sent.append(text)
+        tg = Picky()
+        self.bot.tg = tg
+        self.bot.say("<b>x</b> CA: <code>M</code>", html=True)
+        self.assertEqual(tg.sent, ["x CA: M"])
+
     def test_stop_sells_everything(self):
         self.bot.discover()
         msg = self.bot.command("/stop")
@@ -170,7 +191,9 @@ class TelegramTests(unittest.TestCase):
         self.assertEqual(t.offset, 9)
         self.assertEqual([t.authorized(c) for c, _ in msgs], [True, False])
         t.send("hi")
-        self.assertEqual(calls[-1], ("sendMessage", {"chat_id": "42", "text": "hi"}))
+        self.assertEqual(calls[-1], ("sendMessage", {"chat_id": "42", "text": "hi", "disable_web_page_preview": True}))
+        t.send("<b>x</b>", html=True)
+        self.assertEqual(calls[-1][1]["parse_mode"], "HTML")
 
 
 if __name__ == "__main__":

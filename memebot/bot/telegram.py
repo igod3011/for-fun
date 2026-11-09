@@ -39,9 +39,13 @@ class Telegram:
         except urllib.error.URLError as e:
             raise RuntimeError(f"telegram {method}: network error {type(e.reason).__name__}") from None
 
-    def send(self, text):
-        if self.chat_id:
-            self._transport("sendMessage", {"chat_id": self.chat_id, "text": text[:4000]})
+    def send(self, text, html=False):
+        if not self.chat_id:
+            return
+        params = {"chat_id": self.chat_id, "text": text[:4000], "disable_web_page_preview": True}
+        if html:
+            params["parse_mode"] = "HTML"
+        self._transport("sendMessage", params)
 
     def poll(self, timeout=25):
         r = self._transport("getUpdates", {"offset": self.offset, "timeout": timeout}, )
@@ -55,6 +59,15 @@ class Telegram:
 
     def authorized(self, chat_id):
         return self.chat_id is not None and chat_id == self.chat_id
+
+
+def token_block(name, mint):
+    """Token name + tap-to-copy contract address (CA) + quick links, as Telegram HTML."""
+    from html import escape
+    n = escape(str(name or "?"))
+    m = escape(mint)
+    return (f"<b>{n}</b>\nCA: <code>{m}</code>\n"
+            f'<a href="https://dexscreener.com/solana/{m}">DexScreener</a> | <a href="https://gmgn.ai/sol/token/{m}">GMGN</a>')
 
 
 def whoami():

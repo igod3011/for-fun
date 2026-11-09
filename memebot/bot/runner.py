@@ -20,7 +20,7 @@ from .paper import Paper
 from .strategy import chase_check, entry_check, exit_decision
 from .review import load as load_log
 from .review import summary
-from .telegram import HELP, Telegram
+from .telegram import HELP, Telegram, token_block
 from .wallets import WalletWatcher, load_watchlist
 
 
@@ -36,10 +36,13 @@ class Bot:
         self.last_err = 0.0
         self.summary_day = None
 
-    def say(self, text):
+    def say(self, text, html=False):
         try:
-            self.tg.send(text)
+            self.tg.send(text, html=html)
         except Exception as e:
+            if html:                                   # malformed HTML must never lose an alert: retry as plain text
+                import re
+                return self.say(re.sub(r"<[^>]+>", "", text))
             print("telegram send failed:", e, flush=True)
 
     # --- trading ------------------------------------------------------------------------------
@@ -63,7 +66,7 @@ class Bot:
                     self.p.log(action="skip", mint=mint, name=r.get("name"), reason=f"pool now {sol:.1f} SOL")
                     continue
                 pos = self.p.buy(r, sol, tok, self.cfg.stake_sol, "entry filter passed")
-            self.say(f"🟢 PAPER BUY {pos.name}\n{self.cfg.stake_sol} SOL, pool {sol:.0f} SOL\nmint {mint}")
+            self.say(f"🟢 PAPER BUY\n{token_block(pos.name, mint)}\n{self.cfg.stake_sol} SOL, pool {sol:.0f} SOL", html=True)
         self.p.save()
 
     def manage(self):
@@ -79,12 +82,15 @@ class Bot:
                 if frac > 0:
                     out, pnl = self.p.sell(mint, frac, sol, tok, reason)
                     tail = f"closed, PnL {pnl:+.4f} SOL" if pnl is not None else f"sold {frac:.0%}"
-                    self.say(f"🔴 PAPER SELL {pos.name}: {reason}\n+{out:.4f} SOL, {tail}")
+                    from html import escape
+                    self.say(f"🔴 PAPER SELL: {escape(reason)}\n{token_block(pos.name, mint)}\n+{out:.4f} SOL, {tail}",
+                             html=True)
                 elif chase_check(pos, sol, tok, now, self.cfg):
                     can, _ = self.p.can_open(0)
                     if can and self.p.balance >= self.cfg.chase_stake_sol:
                         self.p.buy({"mint": mint}, sol, tok, self.cfg.chase_stake_sol, "chase", add_to=pos)
-                        self.say(f"🟡 PAPER ADD {pos.name}: +{self.cfg.chase_stake_sol} SOL (chase)")
+                        self.say(f"🟡 PAPER ADD (chase) +{self.cfg.chase_stake_sol} SOL\n{token_block(pos.name, mint)}",
+                                 html=True)
                 self.p.save()
 
     def follow_step(self):
@@ -122,8 +128,8 @@ class Bot:
                 return
             pos = self.p.buy({"mint": mint, "pool": pool, "name": mint[:6]}, sol, tok, self.cfg.stake_sol,
                              f"follow {len(wallets)} wallet(s): {who}")
-        self.say(f"🐋 PAPER FOLLOW BUY {pos.name}\n{len(wallets)} watched wallet(s) bought: {who}\n"
-                 f"{self.cfg.stake_sol} SOL, pool {sol:.0f} SOL\nmint {mint}")
+        self.say(f"🐋 PAPER FOLLOW BUY\n{token_block(pos.name, mint)}\n{len(wallets)} watched wallet(s) bought: {who}\n"
+                 f"{self.cfg.stake_sol} SOL, pool {sol:.0f} SOL", html=True)
 
     def record_series(self, mint, sol, tok, now):
         """Reserve time series of held pools: lets us replay other exit rules on real data later."""
@@ -148,7 +154,7 @@ class Bot:
                 sol, tok = 0.0, 0.0
             with self.lock:
                 out, pnl = self.p.sell(mint, 1.0, sol, tok, reason)
-            msgs.append(f"{pos.name}: +{out:.4f} SOL (PnL {pnl:+.4f})")
+            msgs.append(f"{pos.name}: +{out:.4f} SOL (PnL {pnl:+.4f})\nCA: {mint}")
         return msgs
 
     # --- telegram -----------------------------------------------------------------------------
@@ -163,7 +169,7 @@ class Bot:
         out = []
         for m, pos in self.p.positions.items():
             age = (time.time() - pos.opened_at) / 60
-            out.append(f"{pos.name}: cost {pos.cost_sol:.3f} SOL, peak x{pos.peak_mult:.2f}, {age:.0f} min\n{m}")
+            out.append(f"{pos.name}: cost {pos.cost_sol:.3f} SOL, peak x{pos.peak_mult:.2f}, {age:.0f} min\nCA: {m}")
         return "\n\n".join(out)
 
     def command(self, text):
