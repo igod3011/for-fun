@@ -69,7 +69,7 @@ Chỉ dùng thư viện chuẩn của Python nên chạy được trên Linux: �
 python -m memebot.ml.entry_timing --data cohort.jsonl
 python -m memebot.ml.entry_timing --data cohort.jsonl --grid
 ```
-`--grid` dò 2.400 cấu hình (thời điểm vào × cắt lỗ × chốt lời × trailing × thời gian giữ) theo walk-forward:
+`--grid` dò 480 cấu hình (thời điểm vào × cắt lỗ × chốt lời × trailing × thời gian giữ) theo walk-forward:
 chọn trên 60% pool cũ hơn, báo kết quả TEST trên 40% pool mới hơn. Chỉ số TEST mới có ý nghĩa.
 So sánh vào lệnh sau 5/15/30/60 phút với 3 bộ lọc (F0 mọi pool còn giao dịch, F1 + chặn dao rơi,
 F2 + lực mua), và 2 cách thoát (giữ đến lúc điền nến, hoặc theo quy tắc của bot). Kết quả tính bằng số SOL
