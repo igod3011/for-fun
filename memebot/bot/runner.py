@@ -47,14 +47,26 @@ class Bot:
 
     # --- trading ------------------------------------------------------------------------------
     def discover(self):
-        for r in self.rows(self.cfg.cohort_path):
+        """Static checks as soon as a pool is registered; the buy decision waits until the pool is
+        entry_delay_min old (then the falling-knife guard is applied to the reserves at that moment)."""
+        horizon = (self.cfg.entry_delay_min + self.cfg.entry_window_min + 20) * 60
+        now = time.time()
+        for r in self.rows(self.cfg.cohort_path, max_age_s=max(horizon, 1800)):
             mint = r.get("mint")
             if not mint or mint in self.p.seen:
                 continue
-            self.p.seen.add(mint)
             ok, why = entry_check(r, self.cfg)
             if not ok:
+                self.p.seen.add(mint)
                 self.p.log(action="skip", mint=mint, name=r.get("name"), reason="; ".join(why))
+                continue
+            age_min = (now - r.get("created", now)) / 60
+            if age_min < self.cfg.entry_delay_min:
+                continue                                       # not yet: check again on a later pass
+            self.p.seen.add(mint)
+            if age_min > self.cfg.entry_delay_min + self.cfg.entry_window_min:
+                self.p.log(action="skip", mint=mint, name=r.get("name"),
+                           reason=f"missed entry window ({age_min:.0f} min old)")
                 continue
             with self.lock:
                 can, why_not = self.p.can_open(self.cfg.stake_sol)

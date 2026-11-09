@@ -70,3 +70,37 @@ class EntryTimingTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ExitFidelityTest(unittest.TestCase):
+    def test_gap_through_stop_fills_at_open_not_at_stop(self):
+        crash = lambda m: 85.0 if m <= 20 else 40.0                       # one-minute gap: price -78%
+        S = et.setup(pool(crash))
+        te, usd, s_e, t_e = et.entry(S, T0, 10, guard=False, momentum=False)
+        q = et.amm.buy(et.STAKE, s_e, t_e, et.FEE)
+        r = et.exit_bot(S, te, usd, s_e, q) / et.STAKE - 1
+        self.assertLess(r, -0.7)                                          # not the idealised -25%
+
+    def test_max_hold_sells_at_that_minute_not_at_fill(self):
+        up_then_dump = lambda m: 85.0 * 1.1 if 10 < m < 150 else (85.0 if m <= 10 else 20.0)
+        S = et.setup(pool(up_then_dump))
+        te, usd, s_e, t_e = et.entry(S, T0, 10, guard=False, momentum=False)
+        q = et.amm.buy(et.STAKE, s_e, t_e, et.FEE)
+        rules = dict(et.DEFAULT_RULES, max_hold=60, tp=[], trail_on=None)
+        r = et.exit_bot(S, te, usd, s_e, q, rules) / et.STAKE - 1
+        self.assertGreater(r, 0.15)                                       # sold at +21% price before the dump
+
+    def test_grid_search_is_walk_forward_and_fast_enough(self):
+        import time
+        import random
+        rows = [pool(knife) for _ in range(500)] + [pool(rocket) for _ in range(150)] + [pool(flat) for _ in range(150)]
+        random.Random(0).shuffle(rows)
+        for i, r in enumerate(rows):                       # distinct creation times, mixed types
+            r["created"] += i
+        lines = []
+        t = time.time()
+        scored = et.grid_search(rows, out=lines.append)
+        self.assertTrue(scored)
+        self.assertTrue(any("TOP 5 BY TRAIN" in l for l in lines))
+        self.assertTrue(any("TEST" in l for l in lines))
+        self.assertLess(time.time() - t, 240)

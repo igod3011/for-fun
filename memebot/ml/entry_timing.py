@@ -78,29 +78,99 @@ def exit_hold(S, q):
     return amm.sell(q, S["s1"], S["t1"], FEE)
 
 
-def exit_bot(S, te, usd_e, s_e, q):
-    held, got, peak, done = q, 0.0, 1.0, set()
+DEFAULT_RULES = {"sl": SL, "tp": TP, "trail_on": TRAIL_ON, "trail": TRAIL, "max_hold": MAX_HOLD}
+
+
+def exit_bot(S, te, usd_e, s_e, q, rules=None):
+    """Walk 1-min candles after entry applying exit rules, like the bot. Stop loss fills at the stop, or at the
+    candle OPEN when the price gapped through it. At max hold, sell at that minute's close. If the pool stops
+    trading or a candle is implausible, whatever is still held is sold into the REAL pool at fill time."""
+    R = rules or DEFAULT_RULES
+    unit = STAKE / q                                       # SOL per token at entry price
+    held, got, peak, done, last = q, 0.0, 1.0, set(), None
     for c in S["c"]:
         if c[0] <= te:
             continue
-        if c[0] > te + MAX_HOLD * 60 or c[0] >= S["t_fill"]:
+        if c[0] >= S["t_fill"]:
             break
         if math.sqrt(S["k"] * (c[4] / S["conv"])) > 5 * s_e:
-            break                                         # implausible candle: stop trusting prices
-        low, close = c[3] / usd_e, c[4] / usd_e
-        mult = lambda m: (got + held * (STAKE / q) * m * (1 - FEE)) / STAKE
-        if mult(low) <= 1 - SL:
-            return got + held * (STAKE / q) * (1 - SL) * (1 - FEE)
-        cur = mult(close)
+            break                                          # implausible candle: stop trusting prices
+        if c[0] > te + R["max_hold"] * 60:
+            if last is not None and c[0] - last[0] <= 180:
+                return got + held * unit * (last[4] / usd_e) * (1 - FEE)
+            break
+        o, low, close = c[1] / usd_e, c[3] / usd_e, c[4] / usd_e
+        value = lambda m: (got + held * unit * m * (1 - FEE)) / STAKE
+        stop_px = None
+        if value(o) <= 1 - R["sl"]:
+            stop_px = o                                    # gapped through the stop
+        elif value(low) <= 1 - R["sl"]:
+            stop_px = ((1 - R["sl"]) * STAKE - got) / (held * unit * (1 - FEE))
+        if stop_px is not None:
+            return got + held * unit * stop_px * (1 - FEE)
+        cur = value(close)
         peak = max(peak, cur)
-        if peak >= 1 + TRAIL_ON and cur <= peak * (1 - TRAIL):
-            return got + held * (STAKE / q) * close * (1 - FEE)
-        for i, (g, frac) in enumerate(TP):
+        if R["trail_on"] is not None and peak >= 1 + R["trail_on"] and cur <= peak * (1 - R["trail"]):
+            return got + held * unit * close * (1 - FEE)
+        for i, (g, frac) in enumerate(R["tp"]):
             if i not in done and cur >= 1 + g:
                 done.add(i)
-                got += held * frac * (STAKE / q) * close * (1 - FEE)
+                got += held * frac * unit * close * (1 - FEE)
                 held *= 1 - frac
+        last = c
     return got + exit_hold(S, held)
+
+
+def describe_rules(R):
+    trail = "off" if R["trail_on"] is None else f"{R['trail']:.0%} after +{R['trail_on']:.0%}"
+    tp = ", ".join(f"{frac:.0%}@+{g:.0%}" for g, frac in R["tp"]) or "none"
+    return f"SL {R['sl']:.0%} | TP {tp} | trail {trail} | max {R['max_hold']}m"
+
+
+def grid_search(rows, train_frac=0.6, out=print):
+    """Walk-forward: pick the exit rules + entry delay that do best on the EARLIER pools, report them on the
+    LATER pools. Only the out-of-sample (test) number says anything about the future."""
+    import itertools
+    pools = sorted(((p, S) for p in rows for S in [setup(p)] if S), key=lambda x: x[0]["created"])
+    cut = int(len(pools) * train_frac)
+    delays = (30, 45, 60, 90, 120)
+    rules = [{"sl": sl, "tp": tp, "trail_on": tr[0], "trail": tr[1], "max_hold": mh}
+             for sl, tp, tr, mh in itertools.product(
+                 (0.10, 0.15, 0.25, 0.35),
+                 ([], [(0.5, 0.5), (1.0, 0.5)], [(0.3, 0.5), (0.6, 0.5)], [(1.0, 0.5)]),
+                 ((0.3, 0.2), (0.2, 0.1), (None, None)),
+                 (60, 120))]
+    entries = {}
+    for d in delays:
+        for i, (p, S) in enumerate(pools):
+            e = entry(S, p["created"], d, guard=True, momentum=False)
+            if e:
+                te, usd, s_e, t_e = e
+                entries.setdefault(d, []).append((i < cut, S, te, usd, s_e, amm.buy(STAKE, s_e, t_e, FEE)))
+    out(f"pools {len(pools)} (train {cut}, test {len(pools) - cut}); configs {len(delays) * len(rules)}")
+    scored = []
+    for d, ents in entries.items():
+        for R in rules:
+            tr, te_ = [], []
+            for is_train, S, te, usd, s_e, q in ents:
+                (tr if is_train else te_).append(exit_bot(S, te, usd, s_e, q, R) / STAKE - 1)
+            if len(tr) >= 30 and len(te_) >= 20:
+                avg = lambda x: sum(min(v, 10) for v in x) / len(x)
+                scored.append((avg(tr), avg(te_), len(tr), len(te_), sum(v > 0 for v in te_) / len(te_), d, R))
+    scored.sort(key=lambda x: -x[0])
+    fmt = describe_rules
+    out("TOP 5 BY TRAIN (chosen without looking at test):")
+    for tr, te_, ntr, nte, win, d, R in scored[:5]:
+        out(f"   +{d:3}min  {fmt(R):58} train {tr:+6.1%} (n={ntr}) | TEST {te_:+6.1%} (n={nte}, win {win:.0%})")
+    base = [x for x in scored if x[5] == 60 and x[6]["sl"] == SL and x[6]["tp"] == [(0.5, 0.5), (1.0, 0.5)]
+            and x[6]["trail_on"] == TRAIL_ON and x[6]["max_hold"] == MAX_HOLD]
+    if base:
+        tr, te_, ntr, nte, win, d, R = base[0]
+        out(f"current bot rules @+60min: train {tr:+.1%} | TEST {te_:+.1%} (n={nte}, win {win:.0%})")
+    best_test = max(scored, key=lambda x: x[1]) if scored else None
+    if best_test:
+        out(f"(hindsight, NOT a valid choice) best on test: +{best_test[5]}min {fmt(best_test[6])} TEST {best_test[1]:+.1%}")
+    return scored
 
 
 def describe(rets):
@@ -148,8 +218,13 @@ def main():
             pass
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", default="cohort.jsonl")
+    ap.add_argument("--grid", action="store_true", help="walk-forward search over entry delay and exit rules")
     a = ap.parse_args()
     rows = [json.loads(l) for l in open(a.data, encoding="utf-8", errors="replace")]
+    if a.grid:
+        grid_search(rows)
+        print("\nOnly TEST numbers matter. If the top-by-train configs are negative on TEST, no rule set has an edge.")
+        return
     run(rows)
     print("\nRead 'avg' (gains capped at +1000%) and whether early/late halves agree. A filter only helps if it\n"
           "beats F0 at the same delay in BOTH halves. All numbers are after ~0.5% fee per swap, 0.05 SOL stake.\n"

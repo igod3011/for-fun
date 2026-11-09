@@ -21,6 +21,7 @@ def row(mint="Abcpump", sol=85.0, tok=2.07e8, top10=0.2, age_s=300, **h):
 
 
 def cfg_in(tmp, **kw):
+    kw.setdefault("entry_delay_min", 0.0)               # most tests: buy at discovery
     return replace(BotConfig(), state_path=os.path.join(tmp, "s.json"), log_path=os.path.join(tmp, "l.jsonl"),
                    series_path=os.path.join(tmp, "series.jsonl"), **kw)
 
@@ -98,7 +99,7 @@ class BotTests(unittest.TestCase):
         self.rows = [row("Aaapump"), row("XYZnotpmp"), row("Bbbpump", top10=0.95)]
         self.tg = FakeTG()
         self.bot = Bot(cfg_in(self.tmp), self.tg, reserves=lambda pool, mint: (self.res["sol"], self.res["tok"]),
-                       rows=lambda path: self.rows)
+                       rows=lambda path, **kw: self.rows)
 
     def test_discover_buys_only_passing_rows_once(self):
         self.bot.discover()
@@ -174,6 +175,23 @@ class BotTests(unittest.TestCase):
         self.res.update(sol=35.0, tok=2.07e8 * 85 / 35)
         self.bot.discover()
         self.assertEqual(self.bot.p.positions, {})
+
+    def test_delayed_entry_waits_then_buys_inside_window_only(self):
+        self.bot.cfg = replace(self.bot.cfg, entry_delay_min=60.0, entry_window_min=30.0)
+        young = row("Youngpump")                              # created ~6 min ago
+        old = row("Oldpump")
+        old["created"], old["registered_at"] = NOW - 65 * 60, NOW - 60 * 60
+        late = row("Latepump")
+        late["created"], late["registered_at"] = NOW - 200 * 60, NOW - 195 * 60
+        self.rows[:] = [young, old, late]
+        self.bot.discover()
+        self.assertEqual(list(self.bot.p.positions), ["Oldpump"])
+        self.assertNotIn("Youngpump", self.bot.p.seen)        # still watched, decided on a later pass
+        self.assertIn("missed entry window", open(self.bot.cfg.log_path).read())
+        young["created"] -= 60 * 60                            # an hour later (clock moves: shift both times)
+        young["registered_at"] -= 60 * 60
+        self.bot.discover()
+        self.assertIn("Youngpump", self.bot.p.positions)
 
     def test_daily_loss_limit(self):
         self.bot.p.day_pnl = -0.25

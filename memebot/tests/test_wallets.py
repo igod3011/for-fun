@@ -96,7 +96,7 @@ class FollowBotTest(unittest.TestCase):
         self.w = FakeWatcher()
         self.tg = FakeTG()
         self.bot = Bot(cfg_in(tmp, follow_enabled=True, follow_min_wallets=2), self.tg,
-                       reserves=lambda pool, mint: (85.0, 2.07e8), rows=lambda p: [],
+                       reserves=lambda pool, mint: (85.0, 2.07e8), rows=lambda p, **kw: [],
                        watcher=self.w, find_pool=lambda mint: "POOL_" + mint)
 
     def test_needs_two_wallets_and_pump_mint(self):

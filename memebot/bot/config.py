@@ -18,6 +18,8 @@ class BotConfig:
     k_min: float = 1.0e10               # canonical pump.fun graduation pool: SOL*tokens ~ 1-2.6e10
     k_max: float = 2.6e10
     max_age_min: float = 15.0           # only pools registered within this many minutes of creation
+    entry_delay_min: float = 60.0       # buy only once the pool is this old (backtest: waiting ~60 min lost least)
+    entry_window_min: float = 30.0      # ... and no later than delay + window (otherwise "missed window")
     max_top10: float = 0.5              # top-10 holders (pool excluded) share of supply
 
     # exits
