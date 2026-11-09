@@ -93,7 +93,18 @@ def realizable_baseline(rows, min_entry_sol=20.0):
     print(f"   {len(snap)} pools with both snapshots: {len(empty)} ({len(empty)/len(snap):.0%}) were ALREADY EMPTY (<1 SOL) "
           f"minutes after creation (untradable), {len(thin)} thin (<{min_entry_sol:.0f} SOL) excluded")
     tradable = [p for p in snap if (p["helius_reg"]["pool_sol"] or 0) >= min_entry_sol]
-    for label, grp in (("pump.fun graduates (mint ...pump)", [p for p in tradable if p["mint"].endswith("pump")]),
+    import math
+    pumpm = [p for p in tradable if p["mint"].endswith("pump")]
+    # A real pump.fun graduation seeds the pool with ~85 SOL x ~207M tokens, so k = SOL*tokens ~ 1.7e10 and
+    # trading barely changes k. Pools for a ...pump mint with a very different k were created by someone else.
+    ks = [math.log10(p["helius_reg"]["pool_sol"] * p["helius_reg"]["pool_tokens"]) for p in pumpm
+          if p["helius_reg"].get("pool_tokens")]
+    edges = [(-99, 9), (9, 10), (10, 10.2), (10.2, 10.4), (10.4, 10.6), (10.6, 11), (11, 99)]
+    print("   log10(k=SOL*tokens) of ...pump pools at registration: "
+          + ", ".join(f"[{lo if lo > -99 else ''}-{hi if hi < 99 else ''}):{sum(lo <= k < hi for k in ks)}" for lo, hi in edges))
+    canon = lambda p: p["helius_reg"].get("pool_tokens") and 1.0e10 <= p["helius_reg"]["pool_sol"] * p["helius_reg"]["pool_tokens"] <= 2.6e10
+    for label, grp in (("CANONICAL pump.fun graduation pools (mint ...pump, k~1.7e10)", [p for p in pumpm if canon(p)]),
+                       ("...pump mints in NON-canonical pools", [p for p in pumpm if not canon(p)]),
                        ("other PumpSwap pools", [p for p in tradable if not p["mint"].endswith("pump")])):
         r = [x for x in (realizable_return(p) for p in grp) if x is not None]
         if len(r) < 4:
