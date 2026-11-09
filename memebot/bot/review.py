@@ -14,7 +14,7 @@ from collections import Counter
 
 def _norm(reason):
     """Group reasons that differ only by numbers: 'pool only 5.2 SOL' -> 'pool only # SOL'."""
-    return re.sub(r"[-+]?\d+(\.\d+)?%?", "#", reason).strip()
+    return re.sub(r"(?<![A-Za-z])[-+]?\d+(\.\d+)?%?", "#", reason).strip()
 
 
 def load(path, since_ts=0):
