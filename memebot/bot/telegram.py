@@ -14,6 +14,7 @@ API = "https://api.telegram.org/bot{token}/{method}"
 
 HELP = ("/status - balance, PnL, open positions\n"
         "/positions - details of open positions\n"
+        "/review [hours] - paper results and exit/skip reasons (default 24h)\n"
         "/pause - stop opening new positions (exits still managed)\n"
         "/resume - allow new positions again\n"
         "/sellall - close every open position now\n"

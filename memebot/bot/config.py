@@ -39,6 +39,7 @@ class BotConfig:
     cohort_path: str = "cohort.jsonl"
     log_path: str = "bot_trades.jsonl"
     state_path: str = "bot_state.json"
+    series_path: str = "bot_series.jsonl"
 
     @classmethod
     def load(cls, path="bot_config.json"):

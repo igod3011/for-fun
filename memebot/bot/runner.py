@@ -6,6 +6,7 @@ and the collector running (it writes cohort.jsonl, which is where new pools come
   python -m memebot.bot.runner --once       # one discovery + one position check, then exit (smoke test)
 """
 import argparse
+import json
 import os
 import sys
 import threading
@@ -17,6 +18,8 @@ from .config import BotConfig
 from .data import pool_reserves, recent_cohort_rows
 from .paper import Paper
 from .strategy import chase_check, entry_check, exit_decision
+from .review import load as load_log
+from .review import summary
 from .telegram import HELP, Telegram
 
 
@@ -27,6 +30,7 @@ class Bot:
         self.lock = threading.Lock()
         self.running = True
         self.last_err = 0.0
+        self.summary_day = None
 
     def say(self, text):
         try:
@@ -65,6 +69,7 @@ class Bot:
             if not pos:
                 continue
             sol, tok = self.reserves(pos.pool, mint)
+            self.record_series(mint, sol, tok, now)
             with self.lock:
                 frac, reason = exit_decision(pos, sol, tok, now, self.cfg)
                 if frac > 0:
@@ -77,6 +82,19 @@ class Bot:
                         self.p.buy({"mint": mint}, sol, tok, self.cfg.chase_stake_sol, "chase", add_to=pos)
                         self.say(f"🟡 PAPER ADD {pos.name}: +{self.cfg.chase_stake_sol} SOL (chase)")
                 self.p.save()
+
+    def record_series(self, mint, sol, tok, now):
+        """Reserve time series of held pools: lets us replay other exit rules on real data later."""
+        with open(self.cfg.series_path, "a") as f:
+            f.write(json.dumps({"ts": int(now), "mint": mint, "pool_sol": sol, "pool_tokens": tok}) + "\n")
+
+    def daily_summary(self):
+        today = time.strftime("%Y-%m-%d")
+        if self.summary_day is None:
+            self.summary_day = today
+        elif today != self.summary_day:
+            self.summary_day = today
+            self.say(summary(load_log(self.cfg.log_path, time.time() - 86400), "last 24h") + "\n\n" + self.status())
 
     def sellall(self, reason):
         msgs = []
@@ -114,6 +132,12 @@ class Bot:
             return self.status()
         if cmd == "/positions":
             return self.positions_text()
+        if cmd == "/review":
+            hours = 24
+            parts = text.split()
+            if len(parts) > 1 and parts[1].replace(".", "", 1).isdigit():
+                hours = float(parts[1])
+            return summary(load_log(self.cfg.log_path, time.time() - hours * 3600), f"last {hours:g}h")
         if cmd == "/pause":
             self.p.paused = True
             self.p.save()
@@ -162,6 +186,10 @@ class Bot:
                 self.manage()
             except Exception as e:
                 self.error("manage", e)
+            try:
+                self.daily_summary()
+            except Exception as e:
+                self.error("daily summary", e)
             if once:
                 return
             time.sleep(self.cfg.poll_positions_s)

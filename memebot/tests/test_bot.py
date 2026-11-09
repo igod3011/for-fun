@@ -21,7 +21,8 @@ def row(mint="Abcpump", sol=85.0, tok=2.07e8, top10=0.2, age_s=300, **h):
 
 
 def cfg_in(tmp, **kw):
-    return replace(BotConfig(), state_path=os.path.join(tmp, "s.json"), log_path=os.path.join(tmp, "l.jsonl"), **kw)
+    return replace(BotConfig(), state_path=os.path.join(tmp, "s.json"), log_path=os.path.join(tmp, "l.jsonl"),
+                   series_path=os.path.join(tmp, "series.jsonl"), **kw)
 
 
 class EntryTests(unittest.TestCase):
@@ -121,6 +122,19 @@ class BotTests(unittest.TestCase):
         self.rows.append(row("Cccpump"))
         self.bot.discover()
         self.assertEqual(list(self.bot.p.positions), ["Cccpump"])
+
+    def test_review_and_series(self):
+        self.bot.discover()
+        self.bot.manage()                                       # flat: holds, but records a reserve point
+        self.res.update(sol=10.0, tok=2.07e8 * 85 / 10)
+        self.bot.manage()                                       # dumped: closes
+        series = open(self.bot.cfg.series_path).read().splitlines()
+        self.assertEqual(len(series), 2)
+        text = self.bot.command("/review")
+        self.assertIn("closed trades 1", text)
+        self.assertIn("win rate 0%", text)
+        self.assertIn("stop loss", text)
+        self.assertIn("top skip reasons", text)
 
     def test_stop_sells_everything(self):
         self.bot.discover()
