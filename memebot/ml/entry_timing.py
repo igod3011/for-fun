@@ -122,6 +122,18 @@ def exit_bot(S, te, usd_e, s_e, q, rules=None):
     return got + exit_hold(S, held)
 
 
+def bootstrap_ci(rets, n=2000, level=0.9, seed=0):
+    """Percentile bootstrap CI of the mean (gains capped at +1000%). If it contains 0, no proven edge."""
+    import random
+    if len(rets) < 5:
+        return None
+    rng = random.Random(seed)
+    x = [min(r, 10) for r in rets]
+    means = sorted(sum(rng.choice(x) for _ in x) / len(x) for _ in range(n))
+    lo, hi = means[int((1 - level) / 2 * n)], means[int((1 + level) / 2 * n) - 1]
+    return lo, hi
+
+
 def describe_rules(R):
     trail = "off" if R["trail_on"] is None else f"{R['trail']:.0%} after +{R['trail_on']:.0%}"
     tp = ", ".join(f"{frac:.0%}@+{g:.0%}" for g, frac in R["tp"]) or "none"
@@ -157,18 +169,22 @@ def grid_search(rows, train_frac=0.6, out=print):
                 (tr if is_train else te_).append((exit_bot(S, te, usd, s_e, q, R) - TX_FEE) / STAKE - 1)
             if len(tr) >= 30 and len(te_) >= 20:
                 avg = lambda x: sum(min(v, 10) for v in x) / len(x)
-                scored.append((avg(tr), avg(te_), len(tr), len(te_), sum(v > 0 for v in te_) / len(te_), d, R))
+                scored.append((avg(tr), avg(te_), len(tr), len(te_), sum(v > 0 for v in te_) / len(te_), d, R, te_))
     scored.sort(key=lambda x: -x[0])
     fmt = describe_rules
     out("TOP 5 BY TRAIN (chosen without looking at test):")
-    for tr, te_, ntr, nte, win, d, R in scored[:5]:
-        out(f"   +{d:3}min  {fmt(R):58} train {tr:+6.1%} (n={ntr}) | TEST {te_:+6.1%} (n={nte}, win {win:.0%})")
+    for tr, te_, ntr, nte, win, d, R, tr_list in scored[:5]:
+        ci = bootstrap_ci(tr_list)
+        ci_txt = f", 90% CI {ci[0]:+.1%}..{ci[1]:+.1%}" if ci else ""
+        out(f"   +{d:3}min  {fmt(R):58} train {tr:+6.1%} (n={ntr}) | TEST {te_:+6.1%} (n={nte}, win {win:.0%}{ci_txt})")
     for label, d0, R0 in (("old bot rules @+60min", 60, (0.25, [(0.5, 0.5), (1.0, 0.5)], 0.3, 120)),
                           ("NEW bot rules @+90min", 90, (0.10, [], 0.2, 60))):
         base = [x for x in scored if x[5] == d0 and (x[6]["sl"], x[6]["tp"], x[6]["trail_on"], x[6]["max_hold"]) == R0]
         if base:
-            tr, te_, ntr, nte, win, d, R = base[0]
-            out(f"{label}: train {tr:+.1%} | TEST {te_:+.1%} (n={nte}, win {win:.0%})")
+            tr, te_, ntr, nte, win, d, R, tr_list = base[0]
+            ci = bootstrap_ci(tr_list)
+            ci_txt = f", 90% CI {ci[0]:+.1%}..{ci[1]:+.1%}" if ci else ""
+            out(f"{label}: train {tr:+.1%} | TEST {te_:+.1%} (n={nte}, win {win:.0%}{ci_txt})")
     best_test = max(scored, key=lambda x: x[1]) if scored else None
     if best_test:
         out(f"(hindsight, NOT a valid choice) best on test: +{best_test[5]}min {fmt(best_test[6])} TEST {best_test[1]:+.1%}")
@@ -230,7 +246,8 @@ def main():
     rows = [json.loads(l) for l in open(a.data, encoding="utf-8", errors="replace")]
     if a.grid:
         grid_search(rows)
-        print("\nOnly TEST numbers matter. If the top-by-train configs are negative on TEST, no rule set has an edge.")
+        print("\nOnly TEST numbers matter. If the top-by-train configs are negative on TEST, no rule set has an edge.\n"
+              "If the 90% CI includes 0, a positive TEST average may still be luck: collect more data.")
         return
     run(rows)
     print("\nRead 'avg' (gains capped at +1000%) and whether early/late halves agree. A filter only helps if it\n"

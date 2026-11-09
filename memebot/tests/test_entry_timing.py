@@ -118,3 +118,15 @@ class TxFeeTest(unittest.TestCase):
         finally:
             et.TX_FEE = 0.0
         self.assertAlmostEqual((base - with_fee) / et.STAKE, 2 * 0.0003 / 0.05, places=6)   # 1.2% at 0.05 SOL
+
+
+class BootstrapTest(unittest.TestCase):
+    def test_ci_contains_zero_for_noise_and_not_for_clear_edge(self):
+        import random
+        rng = random.Random(3)
+        noise = [rng.gauss(0.0, 0.25) for _ in range(60)]
+        edge = [rng.gauss(0.2, 0.05) for _ in range(60)]
+        lo, hi = et.bootstrap_ci(noise)
+        self.assertTrue(lo < 0 < hi)
+        lo, hi = et.bootstrap_ci(edge)
+        self.assertGreater(lo, 0)
