@@ -6,11 +6,11 @@ chỉ được thêm khi paper trading có lãi sau phí trong vài tuần.
 ## Cách hoạt động
 1. **Nguồn token:** đọc các pool mới mà bộ thu thập vừa ghi vào `cohort.jsonl` (cần bộ thu thập đang chạy).
 2. **Bộ lọc vào lệnh** (`strategy.entry_check`): mint pump.fun, pool tốt nghiệp thật (k = SOL×token trong
-   1,0–2,6×10¹⁰), ≥20 SOL, không còn mint/freeze authority, top 10 holder ≤50%, đăng ký ≤15 phút sau khi tạo.
+   1,0–2,6×10¹⁰), ≥40 SOL, không còn mint/freeze authority, top 10 holder ≤50%, đăng ký ≤15 phút sau khi tạo.
    Đây là bộ lọc tạm thời; quy tắc tốt hơn sẽ đến từ phân tích dữ liệu 2 tuần.
 3. **Chờ đến khi pool được 90 phút tuổi** (`entry_delay_min`, cửa sổ 30 phút), rồi kiểm tra lại "dao rơi":
-   pool còn ≥40 SOL và SOL không giảm quá 20% so với lúc ghi nhận. Đạt thì **mua giả lập** 0,05 SOL theo dự trữ
-   thật lúc đó, cộng phí giao dịch cố định 0,0003 SOL mỗi lệnh (`tx_fee_sol`). Cỡ lệnh paper 0,2 SOL (`stake_sol`).
+   pool còn ≥40 SOL và SOL không giảm quá 20% so với lúc ghi nhận. Đạt thì **mua giả lập** 0,2 SOL (`stake_sol`) theo dự trữ
+   thật lúc đó (có tính dự trữ ảo 17,584 SOL của pool, xem `amm.py`), cộng phí cố định 0,0003 SOL mỗi lệnh (`tx_fee_sol`).
 4. **Kiểm tra trước khi mua** (`intel.py`, RugCheck + DexScreener, miễn phí): bỏ qua nếu ví dev còn giữ >3%
    nguồn cung, dev từng rug token khác, ví insider/bundle chiếm >10%, hoặc giá đã tăng >80% trong 1 giờ.
    Không lấy được dữ liệu RugCheck thì cũng không mua. Tin nhắn mua có giá, vốn hóa (MC), % tăng 1 giờ,
@@ -18,8 +18,9 @@ chỉ được thêm khi paper trading có lãi sau phí trong vài tuần.
 5. **Theo dõi mỗi 15 giây** (`strategy.exit_decision`), giá trị tính bằng số SOL pool thật sự trả:
    cắt lỗ −10%, trailing stop 10% sau khi lãi +20%, không chốt lời cố định,
    thoát khi SOL trong pool bị rút 25% so với đỉnh, giữ tối đa 60 phút.
-   Bộ quy tắc này đến từ dò tìm walk-forward trên 839 pool (TEST khoảng +3% mỗi lệnh trên 62 lệnh, chưa có ý
-   nghĩa thống kê). Bot paper chính là phép thử ngoài mẫu tiếp theo.
+   Bộ quy tắc này đến từ dò tìm walk-forward trên 839 pool. **Con số +3% lúc đó là ảo** (backtest coi cắt lỗ khớp
+   đúng mức stop); đo lại ngày 11/11/2026 trên 1.309 pool: TEST −28,1% mỗi lệnh, chắc chắn lỗ. Bot paper thật
+   cũng mất gần hết 1 SOL sau 15 lệnh. Xem `PROJECT.md` mục 5.
    "Mua đuổi" (`chase_enabled`) có sẵn nhưng mặc định TẮT.
 6. **Giới hạn rủi ro:** tối đa 3 vị thế, ngừng mở lệnh mới khi lỗ trong ngày ≥0,6 SOL (nới cho paper để không cắt
    ngắn phép đo; phải đặt chặt lại trước khi dùng tiền thật).
@@ -47,7 +48,7 @@ Muốn đổi thông số: tạo file `bot_config.json` cùng thư mục, ví d�
    `--once` chạy thử một vòng rồi thoát. Sau `start_bot.bat` bạn sẽ nhận tin "bot started" trong Telegram.
 
 ## Lệnh Telegram
-`/status`, `/positions`, `/pause`, `/resume`, `/sellall`, `/stop`, `/help`.
+`/status`, `/positions`, `/review [giờ]`, `/pause`, `/resume`, `/sellall`, `/stop`, `/help`.
 Bot chỉ nghe lệnh từ đúng `TELEGRAM_CHAT_ID`; tin nhắn từ người khác bị bỏ qua.
 
 ## Chuyển lên VPS sau này
@@ -67,7 +68,8 @@ Chỉ dùng thư viện chuẩn của Python nên chạy được trên Linux: �
    ```
    {"follow_enabled": true, "follow_min_wallets": 1}
    ```
-   rồi chạy lại `memebot\start_bot.bat`. Bot kiểm tra giao dịch của các ví mỗi 60 giây; khi đủ số ví cùng mua
+   rồi chạy lại `memebot\start_bot.bat`. Nếu `smart_wallets.json` ghi `FAIL`, bot coi danh sách ví là rỗng và
+   không khởi động chế độ này. Bot kiểm tra giao dịch của các ví mỗi 60 giây; khi đủ số ví cùng mua
    một token pump.fun có pool tốt nghiệp thật, bot mua giả lập và báo "🐋 PAPER FOLLOW BUY".
    Tốn Helius: khoảng 1 lệnh gọi mỗi ví mỗi phút, cộng 1 lệnh cho mỗi giao dịch mới của ví.
 
@@ -80,7 +82,8 @@ python -m memebot.ml.entry_timing --data cohort.jsonl --grid
 chọn trên 60% pool cũ hơn, báo kết quả TEST trên 40% pool mới hơn. Chỉ số TEST mới có ý nghĩa.
 Mặc định tính phí cố định 0,0003 SOL mỗi giao dịch; đổi bằng `--tx-fee` và cỡ lệnh bằng `--stake`.
 `--max-h1 0.8` bỏ các lệnh mà giá đã tăng >80% trong giờ trước đó (kiểm chứng quy tắc của bot).
-Quy tắc dev/bundle chưa backtest được: bộ thu thập bắt đầu lưu `rc_reg` (RugCheck lúc ghi nhận) từ bản này.
+Quy tắc dev/bundle và số holder: `python -m memebot.ml.rc_rules --data cohort.jsonl --stake 0.2 --max-h1 0.8`.
+`--stop-fill close|low|stop` chọn cách khớp cắt lỗ trong nến (mặc định `close`; `stop` là mô hình cũ, quá lạc quan).
 So sánh vào lệnh sau 5/15/30/60 phút với 3 bộ lọc (F0 mọi pool còn giao dịch, F1 + chặn dao rơi,
 F2 + lực mua), và 2 cách thoát (giữ đến lúc điền nến, hoặc theo quy tắc của bot). Kết quả tính bằng số SOL
 thật rút ra được từ pool. Một bộ lọc chỉ có ích nếu tốt hơn F0 ở cả nửa đầu lẫn nửa sau của dữ liệu.

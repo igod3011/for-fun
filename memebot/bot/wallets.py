@@ -14,8 +14,15 @@ QUOTES = {WSOL, "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "Es9vMFrzaCERmJf
 def load_watchlist(path):
     if not os.path.exists(path):
         return []
-    d = json.load(open(path))
-    return d["wallets"] if isinstance(d, dict) else d
+    with open(path) as f:
+        d = json.load(f)
+    if isinstance(d, dict):
+        # wallet_scores writes the list even when its out-of-sample test FAILs; following those wallets would be
+        # trading on a signal we measured to be worthless, so a FAIL verdict yields an empty watchlist.
+        if str(d.get("verdict", "")).upper().startswith("FAIL"):
+            return []
+        return d.get("wallets", [])
+    return d
 
 
 def buys_in_tx(tx, wallet):

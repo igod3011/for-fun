@@ -17,7 +17,7 @@ from . import amm
 from .config import BotConfig
 from .data import find_pumpswap_pool, pool_reserves, recent_cohort_rows
 from .paper import Paper
-from .strategy import chase_check, entry_check, exit_decision
+from .strategy import entry_check, exit_decision
 from .review import load as load_log
 from .review import summary
 from .intel import fetch as fetch_intel
@@ -28,9 +28,10 @@ from .wallets import WalletWatcher, load_watchlist
 
 class Bot:
     def __init__(self, cfg, tg, reserves=pool_reserves, rows=recent_cohort_rows, watcher=None, find_pool=None,
-                 intel=None):
+                 intel=None, holders=None):
         self.cfg, self.tg, self.reserves, self.rows = cfg, tg, reserves, rows
         self.intel = intel                 # callable(mint, pool) -> (rugcheck_info, dex_info); None = skip
+        self.holders = holders             # callable(cohort_row) -> holder snapshot (Helius DAS); None = skip
         self.watcher, self.find_pool = watcher, find_pool
         self.follow_hits = {}            # mint -> {wallet: ts}
         self.followed = set()
@@ -39,6 +40,7 @@ class Bot:
         self.running = True
         self.last_err = 0.0
         self.summary_day = None
+        self.warned_balance = False
 
     def say(self, text, html=False):
         try:
@@ -72,47 +74,82 @@ class Bot:
                 self.p.log(action="skip", mint=mint, name=r.get("name"),
                            reason=f"missed entry window ({age_min:.0f} min old)")
                 continue
-            with self.lock:
-                can, why_not = self.p.can_open(self.cfg.stake_sol)
-                if not can:
-                    self.p.log(action="skip", mint=mint, name=r.get("name"), reason=f"risk gate: {why_not}")
-                    continue
-                sol, tok = self.reserves(r["pool"], mint)          # price NOW, not at registration
-                if sol < self.cfg.min_pool_sol:
-                    self.p.log(action="skip", mint=mint, name=r.get("name"), reason=f"pool now {sol:.1f} SOL")
-                    continue
-                reg_sol = (r.get("helius_reg") or {}).get("pool_sol") or 0
-                if reg_sol and sol < (1 - self.cfg.max_drop_since_reg) * reg_sol:
-                    self.p.log(action="skip", mint=mint, name=r.get("name"),
-                               reason=f"falling knife: pool SOL {reg_sol:.0f} -> {sol:.0f} since registration")
-                    continue
-                ok, info, price, mcap = self.check_intel(mint, r["pool"], r.get("name"))
-                if not ok:
-                    continue
-                pos = self.p.buy(r, sol, tok, self.cfg.stake_sol, "entry filter passed", price_usd=price, mcap=mcap)
-            self.say(f"🟢 PAPER BUY\n{token_block(pos.name, mint)}\n{info}{self.cfg.stake_sol} SOL, pool {sol:.0f} SOL",
-                     html=True)
+            try:
+                self.consider(r, mint)
+            except Exception as e:
+                # a failed RPC/API call must not silently drop the candidate for good (it used to: the mint was
+                # already in `seen` and nothing was logged). Retry on the next pass while it is inside its window.
+                self.p.seen.discard(mint)
+                self.error(f"discover {mint[:8]}", e)
         self.p.save()
 
-    def check_intel(self, mint, pool, name):
-        """RugCheck + DexScreener rules right before buying. Returns (ok, message_lines, price_usd, mcap)."""
+    def consider(self, r, mint):
+        """Risk gate + live reserves + intel for one candidate that is inside its entry window; buys if all pass."""
+        with self.lock:
+            can, why_not = self.p.can_open(self.cfg.stake_sol)
+            if not can:
+                self.p.log(action="skip", mint=mint, name=r.get("name"), reason=f"risk gate: {why_not}")
+                if why_not == "insufficient balance" and not self.warned_balance:
+                    self.warned_balance = True             # the bot once sat idle for a day without saying so
+                    self.say(f"⚠️ Hết vốn paper: số dư {self.p.balance:.4f} SOL < lệnh {self.cfg.stake_sol} SOL. "
+                             f"Bot KHÔNG mở lệnh mới nữa cho đến khi nạp lại vốn (bot_state.json).")
+                return
+            sol, tok = self.reserves(r["pool"], mint)          # price NOW, not at registration
+            if sol < self.cfg.min_pool_sol:
+                self.p.log(action="skip", mint=mint, name=r.get("name"), reason=f"pool now {sol:.1f} SOL")
+                return
+            reg_sol = (r.get("helius_reg") or {}).get("pool_sol") or 0
+            if reg_sol and sol < (1 - self.cfg.max_drop_since_reg) * reg_sol:
+                self.p.log(action="skip", mint=mint, name=r.get("name"),
+                           reason=f"falling knife: pool SOL {reg_sol:.0f} -> {sol:.0f} since registration")
+                return
+            snap = self.entry_snapshot(r, sol, tok)
+            ok, info, price, mcap = self.check_intel(mint, r["pool"], r.get("name"), **snap)
+            if not ok:
+                return
+            pos = self.p.buy(r, sol, tok, self.cfg.stake_sol, "entry filter passed", price_usd=price, mcap=mcap, **snap)
+        grew = f"Holder {snap['holders_reg']} → {snap['holders_entry']}\n" if snap.get("holders_entry") is not None else ""
+        self.say(f"🟢 PAPER BUY\n{token_block(pos.name, mint)}\n{info}{grew}{self.cfg.stake_sol} SOL, pool {sol:.0f} SOL",
+                 html=True)
+
+    def entry_snapshot(self, r, sol, tok):
+        """Second holder snapshot, taken right before the buy decision (the first one is ~5 min after creation; we
+        buy at ~90 min). Only for candidates that passed every free check: a few dozen a day, 10-20 Helius credits
+        each. RECORDED with the decision, not yet used as a rule: there is no data to validate a threshold on."""
+        h0 = r.get("helius_reg") or {}
+        snap = {"holders_reg": h0.get("holders"), "top10_reg": h0.get("top10_pct"), "pool_sol_reg": h0.get("pool_sol"),
+                "pool_tokens_entry": tok}
+        if self.holders:
+            try:
+                h = self.holders(r)
+                snap.update(holders_entry=h.get("holders"), top10_entry=h.get("top10_pct"),
+                            top1_entry=h.get("top1_pct"), accounts_entry=h.get("accounts_fetched"))
+            except BaseException as e:                     # helius exits on a bad key; never block a decision on it
+                if isinstance(e, KeyboardInterrupt):
+                    raise
+                snap["holders_entry_error"] = str(e)[:80]
+        return snap
+
+    def check_intel(self, mint, pool, name, **extra):
+        """RugCheck + DexScreener rules right before buying. Returns (ok, message_lines, price_usd, mcap).
+        extra: fields recorded with a skip (so rejected candidates can be studied like bought ones)."""
         if not (self.intel and self.cfg.use_intel):
             return True, "", 0.0, 0.0
         rc, dx = self.intel(mint, pool)
         ok, why = intel_check(rc, dx, self.cfg)
         if not ok:
-            self.p.log(action="skip", mint=mint, name=name, reason="; ".join(why))
+            self.p.log(action="skip", mint=mint, name=name, reason="; ".join(why), **extra)
             return False, "", 0.0, 0.0
         info = (f"Giá {fmt_price(dx['price_usd'])} | MC {fmt_usd(dx['mcap'])} | 1h {dx['change_h1']:+.0%}\n"
-                f"Dev {(rc['dev_pct'] or 0):.1%} | Insider {rc['insider_pct']:.0%}\n")
+                f"Dev {(rc['dev_pct'] or 0):.1%}\n")
         return True, info, dx["price_usd"], float(dx["mcap"] or 0)
 
-    @staticmethod
-    def price_line(pos, sol, tok):
+    def price_line(self, pos, sol, tok):
         """Entry vs current price/market cap, from the pool's real reserves (no extra API call)."""
         if not (pos.entry_price_usd and pos.entry_pool_tok and tok):
             return ""
-        ratio = (sol / tok) / (pos.entry_pool_sol / pos.entry_pool_tok)
+        v = self.cfg.virtual_quote_sol
+        ratio = amm.price(sol, tok, v) / amm.price(pos.entry_pool_sol, pos.entry_pool_tok, v)
         return (f"Giá {fmt_price(pos.entry_price_usd)} → {fmt_price(pos.entry_price_usd * ratio)}"
                 f" | MC {fmt_usd(pos.entry_mcap)} → {fmt_usd(pos.entry_mcap * ratio)}\n")
 
@@ -122,7 +159,11 @@ class Bot:
             pos = self.p.positions.get(mint)
             if not pos:
                 continue
-            sol, tok = self.reserves(pos.pool, mint)
+            try:
+                sol, tok = self.reserves(pos.pool, mint)
+            except Exception as e:                         # one unreadable pool must not stop the exits of the others
+                self.error(f"manage {mint[:8]}", e)
+                continue
             self.record_series(mint, sol, tok, now)
             with self.lock:
                 frac, reason = exit_decision(pos, sol, tok, now, self.cfg)
@@ -132,12 +173,6 @@ class Bot:
                     from html import escape
                     self.say(f"🔴 PAPER SELL: {escape(reason)}\n{token_block(pos.name, mint)}\n"
                              f"{self.price_line(pos, sol, tok)}+{out:.4f} SOL, {tail}", html=True)
-                elif chase_check(pos, sol, tok, now, self.cfg):
-                    can, _ = self.p.can_open(0)
-                    if can and self.p.balance >= self.cfg.chase_stake_sol:
-                        self.p.buy({"mint": mint}, sol, tok, self.cfg.chase_stake_sol, "chase", add_to=pos)
-                        self.say(f"🟡 PAPER ADD (chase) +{self.cfg.chase_stake_sol} SOL\n{token_block(pos.name, mint)}",
-                                 html=True)
                 self.p.save()
 
     def follow_step(self):
@@ -324,8 +359,9 @@ def main():
         if not wallets:
             sys.exit(f"follow_enabled but no wallets in {cfg.wallets_path} (run memebot.ml.wallet_scores first)")
         watcher = WalletWatcher(wallets, rpc_call)        # standard RPC: public first, Helius fallback
+    from ..helius import holder_snapshot
     bot = Bot(cfg, tg, watcher=watcher, find_pool=lambda mint: find_pumpswap_pool(mint, cfg.cohort_path),
-              intel=fetch_intel)
+              intel=fetch_intel, holders=lambda row: holder_snapshot(row, max_pages=2))
     if a.once:
         bot.loop(once=True)
         print(bot.status())

@@ -5,7 +5,7 @@ key from the URL (?api-key=), which the cloud sandbox's header-injecting proxy c
 does not work inside the Claude cloud container. The key is never printed or written to disk.
 
   python -m memebot.helius --selftest [--data cohort.jsonl]     # check each endpoint, prints OK/FAIL
-  python -m memebot.helius --enrich cohort.jsonl [--max 50]     # adds a "helius" field per pool
+  python -m memebot.helius --inspect NAME --data cohort.jsonl   # top holders of one token
 
 Adds per token: holders (distinct owners), top1/5/10/20 % of supply EXCLUDING the AMM pool, and
 authority info from DAS getAsset. All endpoints used are Helius RPC/DAS methods; if one fails the
@@ -21,6 +21,7 @@ import urllib.request
 
 RPC = "https://mainnet.helius-rpc.com/?api-key={key}"
 WSOL = "So11111111111111111111111111111111111111112"
+SYSTEM_PROGRAM = "11111111111111111111111111111111"
 
 
 def _key():
@@ -92,32 +93,16 @@ def top_owners(accounts, exclude_owners=(), n=10):
     return [[o, round(v / total, 5)] for o, v in ranked]
 
 
-def holder_snapshot(row, max_pages=1):
-    """DAS-only part (10 credits per call): holder stats, top-10 addresses, mint/freeze authority."""
+def holder_snapshot(row, max_pages=2):
+    """DAS getTokenAccounts (10 credits per page of 1000 accounts): holder stats and top-10 addresses.
+    Two pages are enough: >=1000 holders minutes after creation already marks a wallet farm, and those were the
+    pools that cost 30 credits each. Mint/freeze authority now comes from the free RPC (rpc.mint_authorities).
+    When accounts_fetched hits the page limit, `holders` is a floor and the shares are approximate."""
     mint = row["mint"]
     accs = token_accounts(mint, max_pages=max_pages)
     f = holder_features(accs, exclude_owners=[row.get("pool")])
     f["top_holders"] = top_owners(accs, [row.get("pool")], 10)   # addresses: lets us study "smart" wallets
     f["accounts_fetched"] = len(accs)
-    try:
-        ti = rpc("getAsset", {"id": mint}).get("token_info") or {}
-        f["mint_authority"] = ti.get("mint_authority")
-        f["freeze_authority"] = ti.get("freeze_authority")
-        f["supply_raw"] = ti.get("supply")
-    except RuntimeError as e:
-        f["asset_error"] = str(e)[:120]
-    return f
-
-
-def enrich_one(row):
-    """Full snapshot: free reserves (public RPC) + DAS holder data."""
-    from .rpc import pool_reserves
-    f = holder_snapshot(row, max_pages=3)
-    try:
-        f["pool_sol"], f["pool_tokens"] = pool_reserves(row["pool"], row["mint"])
-    except (RuntimeError, KeyError, TypeError) as e:
-        f["pool_error"] = str(e)[:120]
-    f["fetched_at"] = int(time.time())
     return f
 
 
@@ -131,7 +116,8 @@ def owner_kind(addr):
 
 
 def inspect(path, key):
-    rows = [json.loads(l) for l in open(path)]
+    from .store import iter_jsonl
+    rows = iter_jsonl(path)
     row = next((r for r in rows if key == r.get("mint") or key.lower() in (r.get("name") or "").lower()), None)
     if not row:
         sys.exit(f"no row matching {key!r}")
@@ -166,50 +152,25 @@ def selftest(data=None):
             print(f"FAIL {name}: {e}")
 
     check("getHealth/getSlot", lambda: rpc("getSlot", []))
-    check("DAS getAsset(wSOL)", lambda: (rpc("getAsset", {"id": WSOL}).get("id")))
     mint = WSOL
     if data and os.path.exists(data):
-        for l in open(data):
-            mint = json.loads(l)["mint"]
-            break
+        from .store import tail_rows
+        mint = next((r["mint"] for r in tail_rows(data, 200_000) if r.get("mint")), WSOL)
     check(f"DAS getTokenAccounts({mint[:6]}...)",
           lambda: f"{len(rpc('getTokenAccounts', {'mint': mint, 'limit': 5, 'page': 1}).get('token_accounts') or [])} accounts")
     print("ALL OK" if ok else "SOME CHECKS FAILED - send me the FAIL lines (they contain no key)")
 
 
-def enrich_file(path, max_n):
-    rows = [json.loads(l) for l in open(path)]
-    n = 0
-    for r in rows:
-        if "helius" in r or n >= max_n:
-            continue
-        try:
-            r["helius"] = enrich_one(r)
-            n += 1
-            h = r["helius"]
-            print(f"{r.get('name','?')[:18]:18} holders={h['holders']} top10={h['top10_pct'] and round(h['top10_pct']*100,1)}%", flush=True)
-        except RuntimeError as e:
-            print("skip", r.get("name"), e, flush=True)
-    with open(path, "w") as f:
-        for r in rows:
-            f.write(json.dumps(r) + "\n")
-    print(f"enriched {n} pools")
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--selftest", action="store_true")
-    ap.add_argument("--enrich")
     ap.add_argument("--data")
-    ap.add_argument("--max", type=int, default=50)
     ap.add_argument("--inspect", help="token name or mint to inspect (uses --data)")
     a = ap.parse_args()
     if a.selftest:
         selftest(a.data)
     elif a.inspect:
         inspect(a.data, a.inspect)
-    elif a.enrich:
-        enrich_file(a.enrich, a.max)
     else:
         ap.print_help()
 

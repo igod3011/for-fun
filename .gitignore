@@ -1,4 +1,19 @@
-node_modules
-.expo
-npm-debug.log*
-.DS_Store
+__pycache__/
+*.pyc
+*.tmp
+
+# data and state live only on the machine that runs the bot (never in git)
+cohort.jsonl
+cohort.jsonl.before-split
+cohort.fills.jsonl
+cohort.filled.txt
+bot_trades.jsonl
+bot_series.jsonl
+bot_state.json
+bot_config.json
+smart_wallets.json
+archive/
+backups/
+*.log
+*.err
+code.zip

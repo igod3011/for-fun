@@ -69,8 +69,8 @@ def intel_check(rc, dx, cfg):
             bad.append(f"dev holds {rc['dev_pct']:.1%}")
         if cfg.block_creator_rugs and rc["creator_rugs"]:
             bad.append(f"creator has rugged before ({rc['creator_launches']} launches)")
-        if rc["insider_pct"] > cfg.max_insider_pct:
-            bad.append(f"insiders/bundle {rc['insider_pct']:.0%} of supply")
+        # no insider rule: RugCheck's per-holder `insider` flag was 0% on all 348 pools checked (11/2026), so
+        # "insiders > 10%" could never fire. insider_pct is still recorded for later study.
     if dx is None:
         bad.append("dexscreener unavailable")
     elif cfg.max_change_h1 is not None and dx["change_h1"] > cfg.max_change_h1:

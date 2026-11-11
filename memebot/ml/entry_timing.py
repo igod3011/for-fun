@@ -2,7 +2,7 @@
 
 For each canonical pump.fun graduation pool and each entry delay (minutes after the pool was created):
   * entry price from GeckoTerminal 1-min candles, converted to SOL with the registration snapshot;
-    pool reserves at entry from the constant product k = SOL*tokens (registration snapshot);
+    pool reserves at entry from the pool invariant k = (SOL + virtual reserve) * tokens (see bot/amm.py);
   * exit A "hold": sell everything into the REAL pool reserves at fill time (Helius snapshot) -> what you
     would actually get back, however absurd the last trade price looks;
   * exit B "bot rules": the bot's stop loss / take profit / trailing / max hold on candle closes, then exit A
@@ -19,9 +19,13 @@ import math
 import statistics as st
 import sys
 
+from .. import store
 from ..bot import amm
+from ..bot.config import BotConfig
+from ..bot.strategy import entry_check
 
 STAKE, FEE = 0.05, 0.005
+VIRT = amm.PUMP_VIRTUAL_SOL   # virtual quote reserve of pump.fun-migrated pools: price = (SOL + VIRT) / tokens
 TX_FEE = 0.0          # SOL per transaction (priority + base fee); set from the command line (default 0.0003)
 TP = [(0.5, 0.5), (1.0, 0.5)]
 SL, TRAIL_ON, TRAIL, MAX_HOLD = 0.25, 0.3, 0.2, 120
@@ -49,8 +53,14 @@ def setup(p):
     usd_reg = close_at(c, t_reg, tol=300)
     if not c or not usd_reg:
         return None
-    return {"c": c, "k": s0 * t0, "s0": s0, "s1": s1, "t1": t1, "t_reg": t_reg,
-            "conv": usd_reg / (s0 / t0), "t_fill": f.get("fetched_at") or p.get("fetched_at")}
+    # k and the USD->SOL conversion use the pool's real invariant (real SOL + virtual reserve) x tokens
+    return {"c": c, "k": (s0 + VIRT) * t0, "s0": s0, "t0": t0, "s1": s1, "t1": t1, "t_reg": t_reg,
+            "conv": usd_reg / amm.price(s0, t0, VIRT), "t_fill": f.get("fetched_at") or p.get("fetched_at")}
+
+
+def buy_at(s_e, t_e):
+    """Tokens bought with STAKE at real reserves (s_e, t_e)."""
+    return amm.buy(STAKE, s_e, t_e, FEE, VIRT)
 
 
 MAX_H1 = None        # skip entries already up more than this over the previous hour (e.g. 0.8); --max-h1
@@ -64,8 +74,9 @@ def entry(S, created, delay_min, guard, momentum, max_h1=None):
     if not usd:
         return None                                       # nothing traded around te: dead, cannot enter
     p_sol = usd / S["conv"]
-    s_e, t_e = math.sqrt(S["k"] * p_sol), math.sqrt(S["k"] / p_sol)
-    if s_e > 5 * S["s0"]:
+    s_eff, t_e = math.sqrt(S["k"] * p_sol), math.sqrt(S["k"] / p_sol)
+    s_e = s_eff - VIRT                                    # REAL pool SOL: what the bot reads and applies its guard to
+    if s_eff > 5 * (S["s0"] + VIRT) or s_e <= 0:
         return None                                       # implausible price (data glitch)
     if guard:
         if s_e < 40 or (te >= S["t_reg"] and s_e < 0.8 * S["s0"]):
@@ -84,15 +95,20 @@ def entry(S, created, delay_min, guard, momentum, max_h1=None):
 
 
 def exit_hold(S, q):
-    return amm.sell(q, S["s1"], S["t1"], FEE) - (TX_FEE if q > 0 else 0.0)
+    return amm.sell(q, S["s1"], S["t1"], FEE, VIRT) - (TX_FEE if q > 0 else 0.0)
 
+
+# How a stop loss fills when the price crosses it inside a candle: "close" (default) = min(stop, candle close);
+# "low" = candle low (pessimistic bound); "stop" = exactly at the stop (optimistic, the model used until 11/2026:
+# paper trading showed rugs filling at -88%..-100%, not at the stop). --stop-fill
+STOP_FILL = "close"
 
 DEFAULT_RULES = {"sl": SL, "tp": TP, "trail_on": TRAIL_ON, "trail": TRAIL, "max_hold": MAX_HOLD}
 
 
 def exit_bot(S, te, usd_e, s_e, q, rules=None):
-    """Walk 1-min candles after entry applying exit rules, like the bot. Stop loss fills at the stop, or at the
-    candle OPEN when the price gapped through it. At max hold, sell at that minute's close. If the pool stops
+    """Walk 1-min candles after entry applying exit rules, like the bot. Stop loss fills at the candle OPEN when
+    the price gapped through it, otherwise according to STOP_FILL (default: no better than the close). At max hold, sell at that minute's close. If the pool stops
     trading or a candle is implausible, whatever is still held is sold into the REAL pool at fill time."""
     R = rules or DEFAULT_RULES
     unit = STAKE / q                                       # SOL per token at entry price
@@ -102,7 +118,7 @@ def exit_bot(S, te, usd_e, s_e, q, rules=None):
             continue
         if c[0] >= S["t_fill"]:
             break
-        if math.sqrt(S["k"] * (c[4] / S["conv"])) > 5 * s_e:
+        if math.sqrt(S["k"] * (c[4] / S["conv"])) > 5 * (s_e + VIRT):
             break                                          # implausible candle: stop trusting prices
         if c[0] > te + R["max_hold"] * 60:
             if last is not None and c[0] - last[0] <= 180:
@@ -116,6 +132,12 @@ def exit_bot(S, te, usd_e, s_e, q, rules=None):
         elif value(low) <= 1 - R["sl"]:
             stop_px = ((1 - R["sl"]) * STAKE - got) / (held * unit * (1 - FEE))
         if stop_px is not None:
+            # Inside a 1-min candle we do not know the path. A rug is one transaction: the price is at the bottom
+            # before a 15 s poll can react, so filling at the stop level (the old model) turned -100% into -10%.
+            if STOP_FILL == "close":
+                stop_px = min(stop_px, close)              # never better than the stop, never better than the close
+            elif STOP_FILL == "low":
+                stop_px = min(stop_px, low)                # worst case: sold at the bottom of the minute
             return got + held * unit * stop_px * (1 - FEE) - TX_FEE
         cur = value(close)
         peak = max(peak, cur)
@@ -167,7 +189,7 @@ def grid_search(rows, train_frac=0.6, out=print):
             e = entry(S, p["created"], d, guard=True, momentum=False)
             if e:
                 te, usd, s_e, t_e = e
-                entries.setdefault(d, []).append((i < cut, S, te, usd, s_e, amm.buy(STAKE, s_e, t_e, FEE)))
+                entries.setdefault(d, []).append((i < cut, S, te, usd, s_e, buy_at(s_e, t_e)))
     out(f"pools {len(pools)} (train {cut}, test {len(pools) - cut}); configs {len(delays) * len(rules)}")
     scored = []
     for d, ents in entries.items():
@@ -225,7 +247,7 @@ def run(rows, delays=(5, 15, 30, 60), out=print):
                     if not e:
                         continue
                     te, usd, s_e, t_e = e
-                    q = amm.buy(STAKE, s_e, t_e, FEE)
+                    q = buy_at(s_e, t_e)
                     val = exit_hold(S, q) if mode == "hold" else exit_bot(S, te, usd, s_e, q)
                     parts["early" if i < half else "late"].append((val - TX_FEE) / STAKE - 1)
                 results[(name, d, mode)] = parts
@@ -248,12 +270,21 @@ def main():
     ap.add_argument("--tx-fee", type=float, default=0.0003, help="SOL per transaction (priority + base fee)")
     ap.add_argument("--stake", type=float, default=0.05, help="SOL per entry (bigger = less fee drag, more impact)")
     ap.add_argument("--max-h1", type=float, default=None, help="skip entries already up more than this in the last hour (0.8 = +80%%)")
+    ap.add_argument("--bot-filter", action="store_true",
+                    help="only pools the bot's static entry filter accepts (holders, authorities, age): measures the REAL config")
+    ap.add_argument("--stop-fill", choices=("close", "low", "stop"), default="close",
+                    help="stop-loss fill inside a candle: close (default), low (pessimistic), stop (old, optimistic)")
     a = ap.parse_args()
-    global TX_FEE, STAKE, MAX_H1
-    TX_FEE, STAKE, MAX_H1 = a.tx_fee, a.stake, a.max_h1
-    print(f"stake {STAKE} SOL, swap fee {FEE:.1%}, fixed {TX_FEE} SOL per transaction"
+    global TX_FEE, STAKE, MAX_H1, STOP_FILL
+    TX_FEE, STAKE, MAX_H1, STOP_FILL = a.tx_fee, a.stake, a.max_h1, a.stop_fill
+    print(f"stake {STAKE} SOL, swap fee {FEE:.1%}, fixed {TX_FEE} SOL per transaction, stop fill '{STOP_FILL}'"
           + (f", skip if already >{MAX_H1:+.0%} in 1h" if MAX_H1 is not None else ""))
-    rows = [json.loads(l) for l in open(a.data, encoding="utf-8", errors="replace")]
+    rows = store.load(a.data, filled_only=True)
+    if a.bot_filter:
+        cfg = BotConfig()
+        n = len(rows)
+        rows = [p for p in rows if entry_check(p, cfg)[0]]
+        print(f"bot static filter (strategy.entry_check, default BotConfig): {len(rows)} of {n} filled pools pass")
     if a.grid:
         grid_search(rows)
         print("\nOnly TEST numbers matter. If the top-by-train configs are negative on TEST, no rule set has an edge.\n"

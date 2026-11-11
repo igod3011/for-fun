@@ -10,8 +10,10 @@ method and the go/no-go gates for real money. `App.js`/`package.json` at the roo
   live only in environment variables (`HELIUS_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`).
 - **Stdlib only** for `memebot/` runtime code (bot, collector, rpc, helius, report, healthcheck): it must run on the
   user's Windows machine and a Linux VPS with no `pip install`. `ml/train_rug_model.py` (lightgbm) is the exception.
-- **Returns are what the pool would really pay** (constant product on real reserves via `bot/amm.py`), never the last
-  trade price: GeckoTerminal prices are absurd once a pool is drained.
+- **Returns are what the pool would really pay** (`bot/amm.py` on real reserves), never the last trade price:
+  GeckoTerminal prices are absurd once a pool is drained. pump.fun-migrated pools price on
+  `(real SOL + 17.584 virtual SOL) x tokens`: always pass `virt` (`PUMP_VIRTUAL_SOL` / `cfg.virtual_quote_sol`).
+- The local folder is a zip extract, not a git checkout: local changes are lost if the branch zip is re-extracted.
 - **No look-ahead.** Only use information available at decision time. Past mistakes: filtering on collection-time
   liquidity (fake +250%), selection bias from "top pools" lists, first candle = pool-init price.
 - **Evaluate walk-forward with confidence intervals** (`ml/entry_timing.py --grid`). A rule is kept only if it beats

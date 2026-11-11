@@ -16,6 +16,8 @@ import statistics as st
 import sys
 from collections import defaultdict
 
+from .. import store
+from ..bot.amm import PUMP_VIRTUAL_SOL
 from ..report import realizable_return
 
 
@@ -71,9 +73,10 @@ def main():
     ap.add_argument("--top", type=int, default=30)
     ap.add_argument("--out", default="smart_wallets.json")
     a = ap.parse_args()
-    rows = [json.loads(l) for l in open(a.data, encoding="utf-8", errors="replace")]
+    rows = store.load(a.data, candles=False, filled_only=True)
     pools = sorted((p for p in rows if tradable(p)), key=lambda p: p["created"])
-    data = [(p["helius_reg"]["top_holders"], r) for p in pools for r in [realizable_return(p)] if r is not None]
+    data = [(p["helius_reg"]["top_holders"], r) for p in pools
+            for r in [realizable_return(p, virt=PUMP_VIRTUAL_SOL)] if r is not None]
     print(f"tradable canonical pools with holder addresses + outcome: {len(data)}")
     if len(data) < 100:
         print("too few pools yet (need a few days of data collected AFTER the address update)")

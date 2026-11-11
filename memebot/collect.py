@@ -1,11 +1,14 @@
-"""Collect REAL post-migration data for graduated pump.fun tokens (PumpSwap pools).
+"""Collect REAL post-migration data for graduated pump.fun tokens (PumpSwap pools). Run by collector_daemon.
 
-Per pool: GeckoTerminal 1-minute OHLCV (up to ~16h) + pool reserve snapshot, plus a
-RugCheck static snapshot of the token. Output: JSONL, one pool per line.
-GeckoTerminal's free tier is ~30 req/min and the proxy IP is shared, so calls are paced
-and retried with backoff.
+  register   python -m memebot.collect --out cohort.jsonl --max-pools 100 --max-age-h 3
+             newest PumpSwap pools from GeckoTerminal, whatever their later fate (unbiased cohort): reserve
+             snapshot (free RPC); for canonical pump.fun pools also the pool's virtual reserve and mint authorities
+             (free RPC), holders (Helius DAS) and RugCheck. One row per pool is APPENDED to cohort.jsonl.
+  fill       python -m memebot.collect --out cohort.jsonl --fill --min-age-h 3 --max-fill 8
+             for pools older than 3 h: 1-minute candles (GeckoTerminal), RugCheck, reserve snapshot = the real
+             outcome. One row per pool is APPENDED to cohort.fills.jsonl (see store.py). Nothing is rewritten.
 
-Usage: python -m memebot.collect --out DATA.jsonl --max-pools 150
+GeckoTerminal's free tier is ~30 req/min, so calls are paced and retried with backoff.
 """
 import argparse
 import json
@@ -15,6 +18,8 @@ import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
+
+from . import store
 
 GT = "https://api.geckoterminal.com/api/v2/networks/solana"
 SPAN_MIN = {"v": None}   # minutes of history covered by the newest-pools pages of the last discovery
@@ -40,23 +45,20 @@ def parse_ts(s):
     return int(datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp())
 
 
-def candidate_pools(max_pools, min_age_h, max_age_h, source="top"):
+def candidate_pools(max_pools, min_age_h, max_age_h):
+    """Newest pools on Solana (all DEXes, 10 pages of 20), PumpSwap ones kept. Unbiased: no ranking by success."""
     now = time.time()
     out, seen = [], set()
     oldest = now
     for page in range(1, 11):
-        url = (f"{GT}/new_pools?page={page}&include=base_token" if source == "new"
-               else f"{GT}/dexes/pumpswap/pools?page={page}&include=base_token")
-        d = get(url)
+        d = get(f"{GT}/new_pools?page={page}&include=base_token")
         if not d or not d.get("data"):
             break
         for p in d["data"]:
             a = p["attributes"]
             addr = a["address"]
             oldest = min(oldest, parse_ts(a["pool_created_at"]))
-            if source == "new" and p["relationships"]["dex"]["data"]["id"] != "pumpswap":
-                continue
-            if addr in seen:
+            if p["relationships"]["dex"]["data"]["id"] != "pumpswap" or addr in seen:
                 continue
             seen.add(addr)
             age_h = (now - parse_ts(a["pool_created_at"])) / 3600
@@ -70,7 +72,7 @@ def candidate_pools(max_pools, min_age_h, max_age_h, source="top"):
         print(f"page {page}: candidates={len(out)}", flush=True)
         if len(out) >= max_pools:
             break
-    SPAN_MIN["v"] = (now - oldest) / 60 if source == "new" else None
+    SPAN_MIN["v"] = (now - oldest) / 60
     return out[:max_pools]
 
 
@@ -104,57 +106,82 @@ def is_canonical(mint, sol, tok):
 
 
 def helius_snapshot(p, with_holders=True):
-    """Reserves for every pool via the FREE public RPC; Helius DAS holder data (10 credits/call) only for
-    canonical pump.fun pools, and only at registration. Never raises."""
-    from .rpc import pool_reserves
+    """Reserves for every pool via the FREE public RPC. For canonical pump.fun pools at registration also: the
+    pool's virtual quote reserve and the mint/freeze authorities (free RPC), and holder data (Helius DAS, 10
+    credits per 1000 accounts, needs HELIUS_API_KEY). Never raises."""
+    from . import rpc
     try:
-        sol, tok = pool_reserves(p["pool"], p["mint"])
+        sol, tok = rpc.pool_reserves(p["pool"], p["mint"])
     except BaseException as e:
         return {"error": str(e)[:120]}
     snap = {"pool_sol": sol, "pool_tokens": tok, "fetched_at": int(time.time())}
-    if with_holders and os.environ.get("HELIUS_API_KEY") and is_canonical(p["mint"], sol, tok):
+    if not (with_holders and is_canonical(p["mint"], sol, tok)):
+        return snap
+    try:
+        snap["virt_sol"] = rpc.pool_virtual_sol(p["pool"])
+    except Exception as e:
+        snap["virt_error"] = str(e)[:120]
+    try:
+        snap["mint_authority"], snap["freeze_authority"] = rpc.mint_authorities(p["mint"])
+    except Exception as e:
+        snap["authority_error"] = str(e)[:120]
+    if os.environ.get("HELIUS_API_KEY"):
         try:
             from .helius import holder_snapshot
-            snap.update(holder_snapshot(p, max_pages=3))   # stops after page 1 when < 1000 accounts
-        except BaseException as e:
+            snap.update(holder_snapshot(p, max_pages=2))
+        except BaseException as e:                       # helius._key() exits when the key is unusable
             snap["holders_error"] = str(e)[:120]
     return snap
 
 
-def _save(path, rows):
-    tmp = path + ".tmp"
-    with open(tmp, "w") as f:          # json.dumps is ASCII-only, so no encoding problems on Windows
-        for r in rows:
-            f.write(json.dumps(r) + "\n")
-    os.replace(tmp, path)
+def register(path, max_pools, min_age_h, max_age_h):
+    """Append one row per newly seen PumpSwap pool. Duplicates are avoided against the tail of the file: a pool
+    this young can only have been registered in the last few hours."""
+    done = {r.get("pool") for r in store.tail_rows(path)}
+    pools = [p for p in candidate_pools(max_pools, min_age_h, max_age_h) if p["pool"] not in done]
+    with open(path, "a", encoding="utf-8") as f:
+        for p in pools:
+            p["registered_at"] = int(time.time())
+            snap = helius_snapshot(p)
+            p["helius_reg"] = snap
+            if snap.get("pool_tokens") and is_canonical(p["mint"], snap.get("pool_sol") or 0, snap["pool_tokens"]):
+                try:
+                    from .bot.intel import _get, parse_rugcheck
+                    p["rc_reg"] = parse_rugcheck(_get(f"https://api.rugcheck.xyz/v1/tokens/{p['mint']}/report"))
+                except Exception as e:
+                    p["rc_reg"] = {"error": type(e).__name__}
+            f.write(json.dumps(p) + "\n")
+            f.flush()
+    span = SPAN_MIN["v"]
+    print(f"registered {len(pools)} pools | pages cover {span:.0f} min of new pools"
+          + (" -> GAP risk: run more often than this!" if span is not None and span < 6 else ""), flush=True)
+    return len(pools)
 
 
-def fill(path, min_age_h, max_fill=10):
-    rows = [json.loads(l) for l in open(path)]
+def fill(path, min_age_h, max_fill=8):
+    """Fetch the outcome of registered pools older than min_age_h and APPEND it to the fills file."""
+    done = store.filled_pools(path)
+    waiting = [p for p in store.tail_rows(path) if "candles" not in p and p.get("pool") not in done]
     now, n = time.time(), 0
-    for p in rows:
-        if "candles" in p or (now - p["created"]) / 3600 < min_age_h:
+    for p in waiting:
+        if (now - p["created"]) / 3600 < min_age_h:
             continue
-        if n >= max_fill:      # bounded pass: fill must not starve registration (they share one file)
+        if n >= max_fill:      # bounded pass: fill must not delay registration (they run one after the other)
             break
         try:
             o = get(f"{GT}/pools/{p['pool']}/ohlcv/minute?aggregate=1&limit=1000&currency=usd")
-            p["candles"] = sorted(o["data"]["attributes"]["ohlcv_list"]) if o else []   # keep empty: dead pools count!
-            p["rugcheck"] = rugcheck(p["mint"])
-            snap = helius_snapshot(p, with_holders=False)      # outcome only needs reserves (free)
-            if snap:
-                p["helius_fill"] = snap
-            p["fetched_at"] = int(time.time())
+            rec = {"candles": sorted(o["data"]["attributes"]["ohlcv_list"]) if o else [],   # keep empty: dead pools count!
+                   "rugcheck": rugcheck(p["mint"]),
+                   "helius_fill": helius_snapshot(p, with_holders=False),      # outcome only needs reserves (free)
+                   "fetched_at": int(time.time())}
+            store.append_fill(path, p["pool"], rec)
         except Exception as e:                      # one bad pool must not kill the pass
-            p.pop("candles", None)
             print(f"skip pool {p.get('mint', '?')[:8]}: {type(e).__name__}", flush=True)
             continue
         n += 1
-        print(f"filled {p['name'].encode('ascii', 'replace').decode()} candles={len(p['candles'])}", flush=True)
-        if n % 10 == 0:
-            _save(path, rows)   # rewrite the whole file only every 10 pools: it grows to ~100+ MB (disk wear / CPU)
-    _save(path, rows)
-    print(f"filled {n} pools; {sum('candles' not in p for p in rows)} still waiting", flush=True)
+        print(f"filled {p['name'].encode('ascii', 'replace').decode()} candles={len(rec['candles'])}", flush=True)
+    print(f"filled {n} pools; {len(waiting) - n} still waiting", flush=True)
+    return n
 
 
 def main():
@@ -165,56 +192,19 @@ def main():
             pass
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
-    ap.add_argument("--max-pools", type=int, default=150)
-    ap.add_argument("--min-age-h", type=float, default=2.0)
-    ap.add_argument("--max-age-h", type=float, default=15.5)
-    ap.add_argument("--source", choices=["top", "new"], default="top",
-                    help="top = biased toward tokens that did well (DON'T backtest on it); new = unbiased cohort")
-    ap.add_argument("--register-only", action="store_true",
-                    help="store the cohort (no candles yet); fill later with --fill")
-    ap.add_argument("--fill", action="store_true", help="fetch candles for registered pools older than --min-age-h")
-    ap.add_argument("--max-fill", type=int, default=10, help="max pools per --fill pass")
+    ap.add_argument("--max-pools", type=int, default=100)
+    ap.add_argument("--min-age-h", type=float, default=0.0)
+    ap.add_argument("--max-age-h", type=float, default=3.0)
+    ap.add_argument("--fill", action="store_true", help="fetch outcomes for registered pools older than --min-age-h")
+    ap.add_argument("--max-fill", type=int, default=8, help="max pools per --fill pass")
+    # accepted and ignored: a collector_daemon started before 11/2026 still passes them
+    ap.add_argument("--source", choices=["new"], default="new", help=argparse.SUPPRESS)
+    ap.add_argument("--register-only", action="store_true", help=argparse.SUPPRESS)
     a = ap.parse_args()
-    done = set()
-    try:
-        done = {json.loads(l)["pool"] for l in open(a.out)}
-    except FileNotFoundError:
-        pass
     if a.fill:
-        return fill(a.out, a.min_age_h, a.max_fill)
-    pools = [p for p in candidate_pools(a.max_pools, a.min_age_h, a.max_age_h, a.source) if p["pool"] not in done]
-    if a.register_only:
-        with open(a.out, "a") as f:
-            for p in pools:
-                p["registered_at"] = int(time.time())
-                snap = helius_snapshot(p)
-                if snap:
-                    p["helius_reg"] = snap
-                    if snap.get("pool_tokens") and is_canonical(p["mint"], snap.get("pool_sol") or 0, snap["pool_tokens"]):
-                        try:
-                            from .bot.intel import _get, parse_rugcheck
-                            p["rc_reg"] = parse_rugcheck(_get(f"https://api.rugcheck.xyz/v1/tokens/{p['mint']}/report"))
-                        except Exception as e:
-                            p["rc_reg"] = {"error": type(e).__name__}
-                f.write(json.dumps(p) + "\n")
-        span = SPAN_MIN["v"]
-        print(f"registered {len(pools)} pools | pages cover {span:.0f} min of new pools"
-              + (" -> GAP risk: run more often than this!" if span is not None and span < 6 else ""), flush=True)
-        return
-    print(f"{len(pools)} new pools to fetch", flush=True)
-    with open(a.out, "a") as f:
-        for i, p in enumerate(pools, 1):
-            o = get(f"{GT}/pools/{p['pool']}/ohlcv/minute?aggregate=1&limit=1000&currency=usd")
-            if not o:
-                continue
-            candles = sorted(o["data"]["attributes"]["ohlcv_list"])
-            if len(candles) < 30:
-                continue
-            p["candles"] = candles                      # [ts, o, h, l, c, volume_usd]
-            p["rugcheck"] = rugcheck(p["mint"])
-            p["fetched_at"] = int(time.time())
-            f.write(json.dumps(p) + "\n"); f.flush()
-            print(f"[{i}/{len(pools)}] {p['name']} candles={len(candles)}", flush=True)
+        fill(a.out, a.min_age_h, a.max_fill)
+    else:
+        register(a.out, a.max_pools, a.min_age_h, a.max_age_h)
 
 
 if __name__ == "__main__":

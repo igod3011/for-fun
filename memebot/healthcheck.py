@@ -13,6 +13,9 @@ import sys
 import tempfile
 import time
 
+from . import store
+from .bot.amm import PUMP_VIRTUAL_SOL
+
 
 def _age_min(ts):
     return (time.time() - ts) / 60
@@ -28,6 +31,7 @@ def main():
     ap.add_argument("--data", default="cohort.jsonl")
     ap.add_argument("--log", default="daemon.log")
     ap.add_argument("--err", default="daemon.err")
+    ap.add_argument("--state", default="bot_state.json")
     ap.add_argument("--live", action="store_true")
     a = ap.parse_args()
     res = []
@@ -57,14 +61,12 @@ def main():
         out("FAIL", f"{a.log} not found (wrong folder, or daemon never started)")
 
     # 3) cohort growth
-    rows, bad_lines = [], 0
     if os.path.exists(a.data):
-        for l in open(a.data, encoding="utf-8", errors="replace"):
-            try:
-                rows.append(json.loads(l))
-            except ValueError:
-                bad_lines += 1
-        reg = [r["registered_at"] for r in rows if r.get("registered_at")]
+        bad = [0]
+        sum(1 for _ in store.iter_jsonl(a.data, bad))      # count damaged lines
+        bad_lines = bad[0]
+        rows = store.load(a.data, candles=False)
+        reg =[r["registered_at"] for r in rows if r.get("registered_at")]
         if reg:
             age = _age_min(max(reg))
             out("PASS" if age < 8 else ("WARN" if age < 20 else "FAIL"),
@@ -74,8 +76,8 @@ def main():
         if bad_lines:
             out("WARN", f"{bad_lines} unreadable lines in {a.data}")
         # 4) fill progress
-        waiting_old = [r for r in rows if "candles" not in r and (time.time() - r["created"]) / 3600 >= 3.5]
-        fetched = [r["fetched_at"] for r in rows if r.get("fetched_at")]
+        waiting_old = [r for r in rows if not r.get("filled") and (time.time() - r["created"]) / 3600 >= 3.5]
+        fetched = [r["fetched_at"] for r in rows if r.get("filled") and r.get("fetched_at")]
         last = _age_min(max(fetched)) if fetched else None
         if waiting_old and (last is None or last > 30):
             out("WARN", f"{len(waiting_old)} pools older than 3.5h still waiting for candles; last fill "
@@ -91,6 +93,13 @@ def main():
                      and 0.5e10 <= r["helius_reg"]["pool_sol"] * r["helius_reg"]["pool_tokens"] <= 5e10]
             holders = [r for r in canon if r["helius_reg"].get("top_holders") is not None]
             errs = [r["helius_reg"]["holders_error"] for r in canon if r["helius_reg"].get("holders_error")]
+            virt = [r["helius_reg"]["virt_sol"] for r in canon if r["helius_reg"].get("virt_sol") is not None]
+            off = [v for v in virt if abs(v - PUMP_VIRTUAL_SOL) > 0.01 * PUMP_VIRTUAL_SOL]
+            if off:
+                out("WARN", f"virtual reserve read on-chain differs from the {PUMP_VIRTUAL_SOL} SOL used in bot/amm.py "
+                            f"in {len(off)}/{len(virt)} recent canonical pools (e.g. {off[-1]:.3f}): every valuation is off")
+            elif virt:
+                out("PASS", f"virtual reserve on-chain = {virt[-1]:.3f} SOL in {len(virt)}/{len(canon)} recent canonical pools")
             if canon and holders:
                 out("PASS", f"Helius holder data on canonical pools: {len(holders)}/{len(canon)}")
             elif errs:
@@ -104,6 +113,26 @@ def main():
     if os.path.exists(a.err) and os.path.getsize(a.err) > 0:
         e = open(a.err, encoding="utf-8", errors="replace").read().strip().splitlines()
         out("WARN", f"{a.err} is not empty ({len(e)} lines); last: {e[-1][:110] if e else ''}")
+
+    # 5b) the paper bot (only if it has ever run here): alive, and able to open positions?
+    if os.path.exists(a.state):
+        try:
+            with open(a.state) as f:
+                state = json.load(f)
+            from .bot.config import BotConfig
+            cfg = BotConfig.load()
+            age = _age_min(os.path.getmtime(a.state))
+            out("PASS" if age < 10 else "WARN", f"bot state saved {age:.1f} min ago" + ("" if age < 10 else "  -> bot is not running"))
+            need = cfg.stake_sol + cfg.tx_fee_sol
+            if state.get("paused"):
+                out("WARN", "bot is PAUSED: no new positions")
+            elif state.get("balance", 0) < need:
+                out("WARN", f"bot paper balance {state.get('balance', 0):.4f} SOL < {need:.4f} needed per entry"
+                            "  -> it opens NO new positions (measurement has stopped)")
+            else:
+                out("PASS", f"bot paper balance {state['balance']:.4f} SOL, {len(state.get('positions') or {})} open positions")
+        except (ValueError, OSError) as e:
+            out("WARN", f"{a.state} unreadable: {type(e).__name__}")
 
     # 6) live probe: real calls into a TEMP file (never touches cohort.jsonl)
     if a.live:

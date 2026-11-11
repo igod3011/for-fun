@@ -2,10 +2,14 @@
 
   python3 -m memebot.collector_daemon --out cohort.jsonl
 
-Every --register-every minutes (default 2; the newest-200-pools window only spans ~4 min): record newly migrated (PumpSwap) pools, whatever their later fate.
-Every --fill-every minutes (default 5, <=20 pools per pass (~2.5 min) so registration is never starved; GeckoTerminal keeps only ~16.6h of 1-min candles, so the backlog must not grow): fetch candles + RugCheck for registered pools older than 3h
-(dead pools are kept with empty candles: dropping them would reintroduce survivorship bias).
-Safe to stop/restart; data is appended/rewritten in --out. Ctrl+C to stop.
+Every --register-every minutes (default 2): record newly migrated (PumpSwap) pools, whatever their later fate.
+The newest-200-pools window only spans 4-8 minutes, so registration must never wait long: the clock runs from the
+START of each pass, and each fill pass in between is small (--max-fill 8, ~40 s). Until 11/2026 a fill pass took
+20 pools (~2.5 min) every 5 minutes and delayed registration past the window: pools were missed.
+Fill: candles + RugCheck + reserve snapshot for pools older than 3 h (GeckoTerminal keeps only ~16.6 h of 1-min
+candles, so the backlog must not grow; 8 pools per 2 minutes is ~5,700 a day against ~2,300 new pools).
+Dead pools are kept with empty candles: dropping them would reintroduce survivorship bias.
+Safe to stop/restart; both files are append-only (see store.py). Ctrl+C to stop.
 """
 import argparse
 import os
@@ -31,19 +35,21 @@ def main():
             pass
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True)
-    ap.add_argument("--register-every", type=int, default=2)
-    ap.add_argument("--fill-every", type=int, default=5)
+    ap.add_argument("--register-every", type=float, default=2)
+    ap.add_argument("--fill-every", type=float, default=2)
+    ap.add_argument("--max-fill", type=int, default=8)
     a = ap.parse_args()
     nxt_reg = nxt_fill = 0.0
     while True:
         now = time.time()
         if now >= nxt_reg:
-            run("--out", a.out, "--source", "new", "--register-only", "--min-age-h", "0", "--max-age-h", "3", "--max-pools", "100")
-            nxt_reg = time.time() + a.register_every * 60
-        if now >= nxt_fill:
-            run("--out", a.out, "--fill", "--min-age-h", "3", "--max-fill", "20")
-            nxt_fill = time.time() + a.fill_every * 60
-        time.sleep(30)
+            nxt_reg = now + a.register_every * 60          # from the start of the pass: a slow pass does not shift the clock
+            run("--out", a.out, "--max-pools", "100", "--min-age-h", "0", "--max-age-h", "3")
+        elif now >= nxt_fill:
+            nxt_fill = now + a.fill_every * 60
+            run("--out", a.out, "--fill", "--min-age-h", "3", "--max-fill", str(a.max_fill))
+        else:
+            time.sleep(5)
 
 
 if __name__ == "__main__":

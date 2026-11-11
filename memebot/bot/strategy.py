@@ -1,5 +1,5 @@
 """Pure decision functions (no I/O) so they can be unit-tested and replayed on recorded data."""
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 
 from . import amm
 
@@ -16,11 +16,29 @@ class Position:
     peak_mult: float = 1.0
     peak_pool_sol: float = 0.0
     tp_done: list = field(default_factory=list)
-    chased: bool = False
     realized_sol: float = 0.0
     entry_pool_tok: float = 0.0
     entry_price_usd: float = 0.0
     entry_mcap: float = 0.0
+
+    @classmethod
+    def from_state(cls, d):
+        """Tolerates fields written by older versions (e.g. `chased`)."""
+        known = {f.name for f in fields(cls)}
+        return cls(**{k: v for k, v in d.items() if k in known})
+
+
+def farm_reasons(h, cfg):
+    """Wallet-farm signs in a holder snapshot (Helius): thousands of holders minutes after creation, or a top-10
+    share too flat to be organic. 11/2026: such pools ended with one transaction selling the whole supply 9 times
+    out of 10 (ml/rc_rules.py: kept beat flagged in both time halves)."""
+    bad = []
+    holders, t10 = h.get("holders"), h.get("top10_pct")
+    if holders is not None and cfg.max_holders_reg is not None and holders >= cfg.max_holders_reg:
+        bad.append(f"wallet farm: {holders} holders")
+    if t10 is not None and cfg.min_top10 is not None and t10 < cfg.min_top10:
+        bad.append(f"wallet farm: top10 only {t10:.0%}")
+    return bad
 
 
 def entry_check(c, cfg):
@@ -41,11 +59,9 @@ def entry_check(c, cfg):
         bad.append("mint authority active")
     if h.get("freeze_authority"):
         bad.append("freeze authority active")
-    t10 = h.get("top10_pct")
-    if t10 is None:
+    if h.get("top10_pct") is None:
         bad.append("no holder data")
-    elif t10 > cfg.max_top10:
-        bad.append(f"top10 {t10:.0%}")
+    bad += farm_reasons(h, cfg)
     age = (c.get("registered_at", 0) - c.get("created", 0)) / 60
     if age > cfg.max_age_min:
         bad.append(f"too old at registration ({age:.0f} min)")
@@ -56,12 +72,13 @@ def exit_decision(pos, pool_sol, pool_tok, now, cfg):
     """Returns (fraction_to_sell, reason) or (0, None). Value = SOL the pool would REALLY pay now."""
     if pool_tok <= 0 or pos.tokens <= 0:
         return 1.0, "pool empty"
-    value = amm.sell(pos.tokens, pool_sol, pool_tok, cfg.fee)
+    value = amm.sell(pos.tokens, pool_sol, pool_tok, cfg.fee, cfg.virtual_quote_sol)
     mult = (value + pos.realized_sol) / pos.cost_sol
     pos.peak_mult = max(pos.peak_mult, mult)
     pos.peak_pool_sol = max(pos.peak_pool_sol, pool_sol)
-    # price-based stops first; in an AMM a dump also lowers pool SOL, so the drain rule below is meant
-    # for liquidity being pulled while the price has not (yet) moved much
+    # price-based stops first; in an AMM a dump also lowers pool SOL, so the drain rule below only matters for
+    # liquidity pulled at a flat price. LP of pump.fun-migrated pools is burnt (cannot be pulled): what looked
+    # like "liquidity removed" in our data were whole-supply dumps (see amm.py), which the stop loss sees first.
     if mult <= 1 - cfg.stop_loss:
         return 1.0, f"stop loss ({mult - 1:+.0%})"
     if pos.peak_mult >= 1 + cfg.trail_activate and mult <= pos.peak_mult * (1 - cfg.trail):
@@ -75,12 +92,3 @@ def exit_decision(pos, pool_sol, pool_tok, now, cfg):
     if (now - pos.opened_at) / 60 >= cfg.max_hold_min:
         return 1.0, "max hold time"
     return 0.0, None
-
-
-def chase_check(pos, pool_sol, pool_tok, now, cfg):
-    if not cfg.chase_enabled or pos.chased or pos.tp_done:
-        return False
-    mult = (amm.sell(pos.tokens, pool_sol, pool_tok, cfg.fee) + pos.realized_sol) / pos.cost_sol
-    young = (now - pos.opened_at) / 60 <= cfg.chase_window_min
-    deeper = pool_sol >= pos.entry_pool_sol * 1.1
-    return young and deeper and mult >= 1 + cfg.chase_gain

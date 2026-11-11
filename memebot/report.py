@@ -1,11 +1,13 @@
 """Summarise a cohort file produced by collector_daemon / collect.py."""
-import json
 import sys
 import time
 
+from . import store
+from .bot.amm import PUMP_VIRTUAL_SOL
+
 
 def main(path):
-    rows = [json.loads(l) for l in open(path)]
+    rows = store.load(path)
     now = time.time()
     filled = [p for p in rows if "candles" in p]
     live = [p for p in filled if len(p["candles"]) >= 30]
@@ -22,7 +24,8 @@ def main(path):
     if both:
         drained = [p for p in both if p["helius_fill"]["pool_sol"] < 0.2 * p["helius_reg"]["pool_sol"]]
         print(f"Helius snapshots at registration AND fill: {len(both)} pools; "
-              f"pool SOL fell >80% (liquidity pulled OR dumped; either way holders lose ~96%+): {len(drained)} ({len(drained)/len(both):.0%})")
+              f"pool SOL fell >80% (dumped; LP of migrated pools is burnt and cannot be pulled; holders lose ~96%+): "
+              f"{len(drained)} ({len(drained)/len(both):.0%})")
     if filled:
         print(f"dead/illiquid: {len(filled) - len(live)}/{len(filled)} filled pools ({(len(filled) - len(live)) / len(filled):.0%}) "
               f"traded in fewer than 30 minutes of their first 3h+ -> most graduated memecoins die almost immediately")
@@ -63,18 +66,19 @@ def cohort_baseline(filled, cost=0.02):
           f"  -> {'NEGATIVE: no edge' if eq < 1 else 'positive: check robustness before believing it'}")
 
 
-def realizable_return(p, stake_sol=0.1, fee=0.01):
+def realizable_return(p, stake_sol=0.1, fee=0.01, virt=0.0):
     """SOL you could actually get back. Buy `stake_sol` at the pool's spot price at registration
     (Helius reserves, minutes after migration), sell everything into the pool's REAL reserves at fill
-    time (constant product: out = sol * q / (tokens + q)). A drained pool returns ~0 whatever its last
-    trade price was. Returns None if a snapshot is missing/invalid."""
+    time (out = (sol + virt) * q / (tokens + q), capped by the real SOL). A drained pool returns ~0 whatever its
+    last trade price was. virt = the pool's virtual quote reserve (PUMP_VIRTUAL_SOL for pump.fun migrations,
+    see bot/amm.py). Returns None if a snapshot is missing/invalid."""
     r, f = p.get("helius_reg") or {}, p.get("helius_fill") or {}
     s0, t0 = r.get("pool_sol"), r.get("pool_tokens")
     s1, t1 = f.get("pool_sol"), f.get("pool_tokens")
     if not s0 or not t0 or s1 is None or t1 is None:
         return None
-    q = stake_sol * (1 - fee / 2) * t0 / (s0 + stake_sol)     # tokens bought (with price impact)
-    out = s1 * q / (t1 + q) * (1 - fee / 2)                   # SOL received selling into the real pool
+    q = stake_sol * (1 - fee / 2) * t0 / (s0 + virt + stake_sol)       # tokens bought (with price impact)
+    out = min((s1 + virt) * q / (t1 + q) * (1 - fee / 2), s1)          # SOL received selling into the real pool
     return out / stake_sol - 1
 
 
@@ -103,10 +107,11 @@ def realizable_baseline(rows, min_entry_sol=20.0):
     print("   log10(k=SOL*tokens) of ...pump pools at registration: "
           + ", ".join(f"[{lo if lo > -99 else ''}-{hi if hi < 99 else ''}):{sum(lo <= k < hi for k in ks)}" for lo, hi in edges))
     canon = lambda p: p["helius_reg"].get("pool_tokens") and 1.0e10 <= p["helius_reg"]["pool_sol"] * p["helius_reg"]["pool_tokens"] <= 2.6e10
-    for label, grp in (("CANONICAL pump.fun graduation pools (mint ...pump, k~1.7e10)", [p for p in pumpm if canon(p)]),
-                       ("...pump mints in NON-canonical pools", [p for p in pumpm if not canon(p)]),
-                       ("other PumpSwap pools", [p for p in tradable if not p["mint"].endswith("pump")])):
-        r = [x for x in (realizable_return(p) for p in grp) if x is not None]
+    for label, grp, virt in (
+            ("CANONICAL pump.fun graduation pools (mint ...pump, k~1.7e10)", [p for p in pumpm if canon(p)], PUMP_VIRTUAL_SOL),
+            ("...pump mints in NON-canonical pools", [p for p in pumpm if not canon(p)], 0.0),
+            ("other PumpSwap pools", [p for p in tradable if not p["mint"].endswith("pump")], 0.0)):
+        r = [x for x in (realizable_return(p, virt=virt) for p in grp) if x is not None]
         if len(r) < 4:
             print(f"   {label}: n={len(r)} (too few)")
             continue
