@@ -1,3 +1,6 @@
+> **Tổng quan đầy đủ (kiến trúc, dữ liệu, kết quả, cách đánh giá): xem [PROJECT.md](PROJECT.md).**
+> Bot 24/7: [bot/README.md](bot/README.md). Prompt cho Claude Code: [PROMPT_CLAUDE_CODE.md](PROMPT_CLAUDE_CODE.md).
+
 # memebot — memecoin paper-trading & backtest framework
 
 Paper trading only: no wallet, no private keys, no real orders.
