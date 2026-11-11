@@ -44,12 +44,15 @@ RULES["x: any risk flag"] = lambda rc: bool(rc.get("risks"))
 # graduation has a few hundred holders by then; thousands of holders with a flat distribution is a wallet farm
 # that later sells the whole supply in one transaction (11/2026: 64% of canonical pools ended that way).
 HOLDER_RULES = {
-    "bot: top10 >50%": lambda h: (h.get("top10_pct") or 0) > 0.5,
+    "old: top10 >50%": lambda h: (h.get("top10_pct") or 0) > 0.5,
     "x: holders >=500": lambda h: (h.get("holders") or 0) >= 500,
     "x: holders >=1000": lambda h: (h.get("holders") or 0) >= 1000,
     "x: holders >=1500": lambda h: (h.get("holders") or 0) >= 1500,
     "x: top10 <15%": lambda h: (h.get("top10_pct") or 0) < 0.15,
-    "x: holders >=1000 or top10 <15%": lambda h: (h.get("holders") or 0) >= 1000 or (h.get("top10_pct") or 0) < 0.15,
+    "bot: farm (holders >=1000 or top10 <15%)": lambda h: (h.get("holders") or 0) >= 1000 or (h.get("top10_pct") or 0) < 0.15,
+    "bot: top1 >=50% or not a migration": lambda h: (h.get("top1_pct") or 0) >= 0.5 or h.get("virt_sol") == 0,
+    "bot: farm or top1 >=50% (= not organic)": lambda h: ((h.get("holders") or 0) >= 1000 or (h.get("top10_pct") or 0) < 0.15
+                                                         or (h.get("top1_pct") or 0) >= 0.5 or h.get("virt_sol") == 0),
 }
 
 

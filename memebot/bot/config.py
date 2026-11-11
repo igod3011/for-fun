@@ -29,6 +29,10 @@ class BotConfig:
     # rejected the better group (-4% vs -22% kept, wrong way round in both halves).
     max_holders_reg: int = 1000         # this many holders ~5 min after creation is a farm, not a crowd (None disables)
     min_top10: float = 0.15             # top-10 (pool excluded) below this share = supply spread over a farm (None disables)
+    # one wallet holding half the supply: either a scripted fake pool (LP pulled at ~30 min, -100%) or a whale-run
+    # token with no upside (98 bot-style trades: mean -14.8%, best +16%). Among non-farm pools this is the group to
+    # drop; the remaining "organic" pools are the only group not clearly negative (11/2026).
+    max_top1: float = 0.5               # largest single holder (pool excluded) at registration (None disables)
 
     # pre-buy intelligence (RugCheck + DexScreener), checked right before buying
     use_intel: bool = True

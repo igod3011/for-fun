@@ -2,6 +2,43 @@
 
 Mới nhất ở trên. Mọi con số là lợi nhuận thực rút được từ pool, sau phí. "TEST" = 40% pool mới nhất, không dùng để chọn.
 
+## 11/11/2026 (tối): đào sâu toàn bộ dữ liệu, bộ lọc "pool tự nhiên"
+Câu hỏi: có cách vào/thoát hay nhóm pool nào dương không? Dữ liệu: 1.396 pool tốt nghiệp theo k, cộng nến 15 phút
+(tới 10 ngày) của 125 pool còn sống sau 3 giờ.
+
+**Bốn nhóm pool, kết quả rất khác nhau** (lệnh kiểu bot tại +90 phút, phí 1,2%):
+
+| Nhóm (nhận diện lúc ghi nhận) | Số pool | Giữ từ lúc ghi nhận | Lệnh kiểu bot | CI 90% | Lệnh tốt nhất |
+|---|---|---|---|---|---|
+| Dàn ví (≥1.000 holder hoặc top 10 <15%) | 700 | −88,6% | −33,9% (n=58) | −44,0..−23,3 | +103% |
+| Một ví giữ ≥50% nguồn cung | 304 | −59,4% | −14,8% (n=98) | −20,8..−9,4 | +16% |
+| **Pool tự nhiên (còn lại)** | 392 | −52,7% | **+9,0% (n=72)** | −10,2..+33,5 | +748% |
+
+- Nhóm "một ví giữ ≥50%" gồm hai loại: (a) pool **giả mạo** không do pump.fun migrate (dự trữ ảo on-chain = 0, người tạo
+  giữ LP): một họ 127 pool chạy theo kịch bản, giá tăng tuyến tính 30 phút, không có lệnh bán nào, rồi rút sạch thanh
+  khoản (126/127 về 0 SOL); (b) token do cá voi khống chế, giá gần như đứng yên, không có cửa lãi.
+- **Quy tắc mới của bot:** bỏ pool không do migrate (`virt_sol == 0`) và pool có một ví giữ ≥50% (`max_top1`).
+  Loại "không tự nhiên" so với giữ lại: −22% (n=156) so với +9% (n=72), cùng chiều ở hai nửa, CI chênh lệch +11..+56.
+- **Đính chính mục A1 buổi sáng:** quy tắc cũ "top 10 >50%" thực ra đang loại đúng nhóm cá voi/giả mạo. Phép so sánh
+  lúc đó sai vì nhóm "giữ lại" còn lẫn dàn ví. Quy tắc đúng là kết hợp: bỏ dàn ví **và** bỏ ví khống chế.
+
+**Walk-forward với bộ lọc mới** (361 pool qua bộ lọc tĩnh): cấu hình hiện tại train +19,0%, **TEST −1,3%** (n=34, thắng
+21%, CI 90% −21,9%..+29,8%). Chuỗi cải thiện trên TEST: −28,3% (mọi pool) → −17,2% (bỏ dàn ví) → −1,3% (pool tự nhiên).
+Đây là hòa vốn với độ bất định rất lớn, chưa phải lợi thế: trung vị mỗi lệnh −10%, lãi dồn vào vài lệnh rất lớn.
+
+**Những hướng đã thử và không có lãi:**
+- 432 cấu hình cắt lỗ rộng/chốt lời/giữ lâu trên pool tự nhiên: 0% dương ở cả train lẫn test.
+- Mua ở mọi tuổi 10–170 phút rồi giữ đến 3 giờ: âm ở mọi tuổi, cả pool sạch lẫn dàn ví.
+- 12 đặc trưng lúc quyết định (đà giá, khối lượng, mức SOL, sụt giảm từ đỉnh...) chia ngũ phân vị: không nhóm nào
+  dương ở cả hai nửa.
+- Mua pool còn sống sau 3 giờ rồi giữ 1–48 giờ: pool tự nhiên −1,7% sau 3 giờ, −39,9% sau 24 giờ (60% mất hơn một nửa).
+- Mô hình đa biến dự đoán lợi nhuận 30 phút tới cho nhóm 5% điểm cao nhất "+19%, thắng 90%": **ảo**. Toàn bộ là họ
+  pool giả mạo ở trên; giá "treo" sau nến cuối không rút được vì thanh khoản đã bị rút.
+
+**Kiến thức bên ngoài đã đối chiếu:** bảng phí PumpSwap theo vốn hóa (1,25% dưới 420 SOL, 1,20% đến 1.470 SOL, giảm
+dần còn 0,30%) khớp số đo; nghiên cứu arXiv 2601.08641 ước tính ví "smart money" lãi khoảng 14% mỗi lệnh nhưng người
+sao chép chỉ còn khoảng 3% sau ma sát; các thống kê CoinGecko/Dune cho thấy đa số ví pump.fun không có lãi đáng kể.
+
 ## 11/11/2026 (chiều): phí thật, dự trữ ảo theo pool, bộ lọc mới, mô hình chọn token
 Dữ liệu: 11.122 pool ghi nhận, 1.360 pool tốt nghiệp thật có kết quả.
 
@@ -81,3 +118,5 @@ tốt khi giữ từ lúc ghi nhận (−96% so với −54%, CI +27..+60) nhưn
 - Nến đầu tiên của pool mở ở giá khởi tạo, không phải giá mua được.
 - Một mô phỏng khớp lệnh lạc quan ở đúng trường hợp xấu nhất sẽ chọn nhầm cấu hình chặt nhất.
 - Luôn đối chiếu công thức với báo giá thật trước khi tin số liệu.
+- Lợi nhuận tính từ giá nến cuối là ảo nếu sau đó không còn giao dịch: phải thoát vào dự trữ thật (như
+  `entry_timing.exit_bot` làm). Một kết quả quá đẹp trên một nhóm nhỏ thường là một cái bẫy được thiết kế cho bot.

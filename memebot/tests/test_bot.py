@@ -32,14 +32,16 @@ class EntryTests(unittest.TestCase):
 
     def test_canonical_pool_passes(self):
         self.assertEqual(entry_check(row(), self.cfg), (True, []))
-        self.assertEqual(entry_check(row(top10=0.9, holders=300), self.cfg), (True, []))   # concentrated is NOT a reason
-        loose = replace(self.cfg, max_holders_reg=None, min_top10=None)
-        self.assertEqual(entry_check(row(top10=0.05, holders=5000), loose), (True, []))     # both rules can be disabled
+        self.assertEqual(entry_check(row(top10=0.9, holders=300, top1_pct=0.3, virt_sol=17.58), self.cfg), (True, []))
+        loose = replace(self.cfg, max_holders_reg=None, min_top10=None, max_top1=None)
+        self.assertEqual(entry_check(row(top10=0.05, holders=5000, top1_pct=0.9), loose), (True, []))   # rules can be disabled
 
     def test_rejections(self):
         cases = {"not a pump.fun mint": row(mint="XYZabc"), "pool only": row(sol=5, tok=2e9),
                  "non-canonical": row(sol=559, tok=8.7e10), "top10 only": row(top10=0.05),
                  "wallet farm: 2500 holders": row(holders=2500), "no holder data": row(top10=None),
+                 "one holder controls 80%": row(top10=0.8, top1_pct=0.7995),
+                 "not a pump.fun migration": row(virt_sol=0.0),
                  "mint authority": row(mint_authority="X"), "too old": row(age_s=3600)}
         for want, r in cases.items():
             ok, why = entry_check(r, self.cfg)

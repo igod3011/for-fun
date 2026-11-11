@@ -7,7 +7,8 @@ chỉ được thêm khi paper trading có lãi sau phí trong vài tuần.
 1. **Nguồn token:** đọc các pool mới mà bộ thu thập vừa ghi vào `cohort.jsonl` (cần bộ thu thập đang chạy).
 2. **Bộ lọc vào lệnh** (`strategy.entry_check`): mint pump.fun, pool tốt nghiệp thật (k = SOL×token trong
    1,0–2,6×10¹⁰), ≥40 SOL, không còn mint/freeze authority, đăng ký ≤15 phút sau khi tạo, và **không phải dàn ví**: dưới 1.000 holder
-   (`max_holders_reg`) và top 10 holder từ 15% trở lên (`min_top10`). Quy tắc cũ "top 10 ≤50%" đã bỏ vì loại nhầm
+   (`max_holders_reg`) và top 10 holder từ 15% trở lên (`min_top10`); pool phải do pump.fun migrate thật (dự trữ ảo on-chain khác 0) và
+   không ví nào giữ từ 50% nguồn cung (`max_top1`). Quy tắc cũ "top 10 ≤50%" đã bỏ vì loại nhầm
    nhóm tốt hơn.
 3. **Chờ đến khi pool được 90 phút tuổi** (`entry_delay_min`, cửa sổ 30 phút), rồi kiểm tra lại "dao rơi":
    pool còn ≥40 SOL và SOL không giảm quá 20% so với lúc ghi nhận. Đạt thì **mua giả lập** 0,2 SOL (`stake_sol`, phí 1,2% mỗi swap) theo dự trữ

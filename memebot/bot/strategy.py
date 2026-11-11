@@ -42,6 +42,19 @@ def farm_reasons(h, cfg):
     return bad
 
 
+def control_reasons(h, cfg):
+    """Pools nobody outside can win in: not created by a pump.fun migration (no virtual reserve on-chain: the
+    creator holds the LP and pulls it; a scripted family did so at ~30 min in 126 of 127 pools), or one wallet holding
+    most of the supply."""
+    bad = []
+    if h.get("virt_sol") == 0:
+        bad.append("not a pump.fun migration (no virtual reserve: LP can be pulled)")
+    t1 = h.get("top1_pct")
+    if t1 is not None and cfg.max_top1 is not None and t1 >= cfg.max_top1:
+        bad.append(f"one holder controls {t1:.0%} of supply")
+    return bad
+
+
 def entry_check(c, cfg):
     """c: a cohort row (from the collector) with a Helius registration snapshot. Returns (ok, reasons)."""
     h = c.get("helius_reg") or {}
@@ -63,6 +76,7 @@ def entry_check(c, cfg):
     if h.get("top10_pct") is None:
         bad.append("no holder data")
     bad += farm_reasons(h, cfg)
+    bad += control_reasons(h, cfg)
     age = (c.get("registered_at", 0) - c.get("created", 0)) / 60
     if age > cfg.max_age_min:
         bad.append(f"too old at registration ({age:.0f} min)")

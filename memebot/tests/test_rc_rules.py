@@ -57,7 +57,7 @@ class RcRulesTest(unittest.TestCase):
         res = rr.run(rows, out=lines.append)
         self.assertEqual(res[("hold", "x: holders >=1000")]["verdict"], "KEEP")
         self.assertEqual(res[("hold", "x: top10 <15%")]["verdict"], "KEEP")
-        self.assertEqual(res[("hold", "bot: top10 >50%")]["verdict"], "too few")      # nobody above 50%
+        self.assertEqual(res[("hold", "old: top10 >50%")]["verdict"], "too few")      # nobody above 50%
         self.assertNotIn(("hold", "bot: creator rugged before"), res)                 # RugCheck section skipped
         self.assertTrue(any("holder data" in l and "60" in l for l in lines))
 

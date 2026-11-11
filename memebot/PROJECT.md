@@ -14,8 +14,8 @@ PumpSwap), điều khiển qua Telegram, giao dịch bằng một ví riêng v�
 **Trạng thái:**
 - Chỉ **paper trading**. Không có ví, private key hay lệnh thật. Chỉ thêm khi đạt mục 7.
 - Bộ thu thập chạy từ 06/11/2026, khoảng 2.300 pool mỗi ngày.
-- **Chưa có lợi thế.** Cấu hình hiện tại lỗ khoảng 17% mỗi lệnh ngoài mẫu (khoảng tin cậy 90% −30%..−0,4%), với phí
-  thật 1,2% mỗi swap. Sổ paper đầu tiên mất gần hết 1 SOL sau 15 lệnh; sổ mới mở ngày 11/11/2026.
+- **Chưa có lợi thế.** Với bộ lọc "pool tự nhiên" (11/11 tối) cấu hình hiện tại ở mức hòa vốn ngoài mẫu: TEST −1,3%
+  mỗi lệnh, khoảng tin cậy 90% −22%..+30%, mới 34 lệnh. Phí thật 1,2% mỗi swap. Sổ paper đầu tiên mất gần hết 1 SOL sau 15 lệnh; sổ mới mở ngày 11/11/2026.
 - Hai điều đã biết chắc: (1) 64% pool tốt nghiệp thật kết thúc bằng một giao dịch xả gần hết nguồn cung từ dàn ví;
   (2) không quy tắc thoát nào cứu được, chỉ có thể tránh từ trước khi mua.
 
@@ -131,14 +131,15 @@ cohort.fills.jsonl:  pool, candles [[ts, o, h, l, c, volume_usd]], rugcheck, hel
 ## 5. Cấu hình bot hiện tại
 
 1. **Lọc tĩnh lúc ghi nhận:** mint pump.fun, pool tốt nghiệp thật, ≥40 SOL, không còn quyền mint/freeze, ghi nhận
-   ≤15 phút sau khi tạo, **không phải dàn ví** (dưới 1.000 holder và top 10 từ 15% trở lên).
+   ≤15 phút sau khi tạo, **không phải dàn ví** (dưới 1.000 holder và top 10 từ 15% trở lên), **do pump.fun migrate
+   thật** (dự trữ ảo on-chain khác 0) và **không ví nào giữ từ 50% nguồn cung**.
 2. **Chờ pool 90 phút tuổi** (cửa sổ 30 phút), pool còn ≥40 SOL và SOL không giảm quá 20% từ lúc ghi nhận.
 3. **Ảnh holder lần hai** (ghi lại, chưa dùng làm quy tắc), rồi RugCheck/DexScreener: dev >3%, dev từng rug, đã tăng
    >80% trong 1 giờ thì bỏ.
 4. **Mua giả lập 0,2 SOL**, phí 1,2% mỗi swap + 0,0003 SOL mỗi giao dịch.
 5. **Thoát:** cắt lỗ 10%, trailing 10% sau +20%, giữ tối đa 60 phút.
 
-Đã bỏ: quy tắc top 10 >50% (loại nhầm nhóm tốt hơn), quy tắc insider (không bao giờ kích hoạt), chế độ mua đuổi.
+Đã bỏ: quy tắc top 10 >50% (thay bằng top 1 ≥50%, xem RESULTS.md), quy tắc insider (không bao giờ kích hoạt), chế độ mua đuổi.
 
 ---
 
