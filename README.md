@@ -1,17 +1,13 @@
-# LifeHub Mobile
+# memebot
 
-Ứng dụng mobile all-in-one để:
-- tạo lịch cá nhân,
-- thiết lập nhắc nhở,
-- lưu ghi chú/ghi nhớ,
-- quản lý chi tiêu,
-- quản lý công việc.
+Hạ tầng nghiên cứu và bot giao dịch **paper** cho memecoin Solana (token vừa tốt nghiệp pump.fun lên PumpSwap).
+Không có ví, private key hay lệnh thật.
 
-## Chạy dự án
+- Tổng quan, cách chạy, cách đánh giá: [memebot/PROJECT.md](memebot/PROJECT.md)
+- Kết quả đến nay: [memebot/RESULTS.md](memebot/RESULTS.md)
+- Bot và lệnh Telegram: [memebot/bot/README.md](memebot/bot/README.md)
+- Quy tắc cho Claude Code: [CLAUDE.md](CLAUDE.md)
 
-```bash
-npm install
-npm run start
 ```
-
-Sau đó mở bằng Expo Go hoặc Android/iOS simulator.
+python -m unittest discover -s memebot/tests -t .
+```

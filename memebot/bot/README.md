@@ -6,22 +6,23 @@ chỉ được thêm khi paper trading có lãi sau phí trong vài tuần.
 ## Cách hoạt động
 1. **Nguồn token:** đọc các pool mới mà bộ thu thập vừa ghi vào `cohort.jsonl` (cần bộ thu thập đang chạy).
 2. **Bộ lọc vào lệnh** (`strategy.entry_check`): mint pump.fun, pool tốt nghiệp thật (k = SOL×token trong
-   1,0–2,6×10¹⁰), ≥40 SOL, không còn mint/freeze authority, top 10 holder ≤50%, đăng ký ≤15 phút sau khi tạo.
-   Đây là bộ lọc tạm thời; quy tắc tốt hơn sẽ đến từ phân tích dữ liệu 2 tuần.
+   1,0–2,6×10¹⁰), ≥40 SOL, không còn mint/freeze authority, đăng ký ≤15 phút sau khi tạo, và **không phải dàn ví**: dưới 1.000 holder
+   (`max_holders_reg`) và top 10 holder từ 15% trở lên (`min_top10`). Quy tắc cũ "top 10 ≤50%" đã bỏ vì loại nhầm
+   nhóm tốt hơn.
 3. **Chờ đến khi pool được 90 phút tuổi** (`entry_delay_min`, cửa sổ 30 phút), rồi kiểm tra lại "dao rơi":
-   pool còn ≥40 SOL và SOL không giảm quá 20% so với lúc ghi nhận. Đạt thì **mua giả lập** 0,2 SOL (`stake_sol`) theo dự trữ
-   thật lúc đó (có tính dự trữ ảo 17,584 SOL của pool, xem `amm.py`), cộng phí cố định 0,0003 SOL mỗi lệnh (`tx_fee_sol`).
+   pool còn ≥40 SOL và SOL không giảm quá 20% so với lúc ghi nhận. Đạt thì **mua giả lập** 0,2 SOL (`stake_sol`, phí 1,2% mỗi swap) theo dự trữ
+   thật lúc đó (có tính dự trữ ảo đọc on-chain của chính pool đó, xem `amm.py`), cộng phí cố định 0,0003 SOL mỗi lệnh (`tx_fee_sol`).
 4. **Kiểm tra trước khi mua** (`intel.py`, RugCheck + DexScreener, miễn phí): bỏ qua nếu ví dev còn giữ >3%
-   nguồn cung, dev từng rug token khác, ví insider/bundle chiếm >10%, hoặc giá đã tăng >80% trong 1 giờ.
+   nguồn cung, dev từng rug token khác, hoặc giá đã tăng >80% trong 1 giờ. Ngay trước đó bot chụp holder lần hai (Helius) và ghi
+   vào nhật ký cùng quyết định; số này chưa dùng làm quy tắc.
    Không lấy được dữ liệu RugCheck thì cũng không mua. Tin nhắn mua có giá, vốn hóa (MC), % tăng 1 giờ,
-   % dev và % insider; tin bán có giá và MC lúc vào so với lúc bán.
+   % dev và số holder lúc ghi nhận → lúc mua; tin bán có giá và MC lúc vào so với lúc bán.
 5. **Theo dõi mỗi 15 giây** (`strategy.exit_decision`), giá trị tính bằng số SOL pool thật sự trả:
    cắt lỗ −10%, trailing stop 10% sau khi lãi +20%, không chốt lời cố định,
    thoát khi SOL trong pool bị rút 25% so với đỉnh, giữ tối đa 60 phút.
    Bộ quy tắc này đến từ dò tìm walk-forward trên 839 pool. **Con số +3% lúc đó là ảo** (backtest coi cắt lỗ khớp
-   đúng mức stop); đo lại ngày 11/11/2026 trên 1.309 pool: TEST −28,1% mỗi lệnh, chắc chắn lỗ. Bot paper thật
+   đúng mức stop); đo lại ngày 11/11/2026 với phí thật 1,2% và bộ lọc dàn ví: TEST −17,2% mỗi lệnh (CI 90% −30,4%..−0,4%). Bot paper thật
    cũng mất gần hết 1 SOL sau 15 lệnh. Xem `PROJECT.md` mục 5.
-   "Mua đuổi" (`chase_enabled`) có sẵn nhưng mặc định TẮT.
 6. **Giới hạn rủi ro:** tối đa 3 vị thế, ngừng mở lệnh mới khi lỗ trong ngày ≥0,6 SOL (nới cho paper để không cắt
    ngắn phép đo; phải đặt chặt lại trước khi dùng tiền thật).
 7. Mọi quyết định (mua, bán, bỏ qua và lý do) ghi vào `bot_trades.jsonl`; trạng thái lưu ở `bot_state.json`

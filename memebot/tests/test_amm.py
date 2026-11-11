@@ -186,5 +186,25 @@ class RobustnessTest(unittest.TestCase):
             helius.rpc = old
 
 
+
+class ResetPaperTest(unittest.TestCase):
+    def test_old_ledger_is_archived_and_a_clean_one_opened(self):
+        from memebot.bot.reset_paper import reset
+        tmp = tempfile.mkdtemp()
+        cfg = cfg_in(tmp)
+        p = Paper(cfg)
+        p.balance, p.total_pnl = 0.0016, -0.9984
+        p.seen.add("Oldpump")
+        p.log(action="skip", mint="Oldpump", reason="x")
+        p.save()
+        folder = reset(cfg, stamp="T", out=lambda *_: None)
+        self.assertEqual(sorted(os.listdir(folder)), ["l.jsonl", "s.json"])        # nothing is deleted
+        with open(os.path.join(folder, "s.json")) as f:
+            self.assertEqual(json.load(f)["balance"], 0.0016)
+        fresh = Paper(cfg)
+        self.assertEqual((fresh.balance, fresh.total_pnl, len(fresh.seen), fresh.positions), (1.0, 0.0, 0, {}))
+        self.assertFalse(os.path.exists(cfg.log_path))
+
+
 if __name__ == "__main__":
     unittest.main()

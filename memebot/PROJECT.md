@@ -1,86 +1,81 @@
 # memebot: bot giao dịch memecoin Solana (paper) và hạ tầng nghiên cứu
 
-Tài liệu tổng quan: mục tiêu, kiến trúc, cách chạy, dữ liệu, kết quả đến 11/2026 và cách đánh giá hiệu quả.
-Nhánh: `claude/mql5-market-product-5p7wht` của repo `igod3011/for-fun`. Mọi code nằm trong `memebot/`.
+Kiến trúc, cách chạy, dữ liệu, cách đánh giá và mốc trước khi dùng tiền thật.
+Lịch sử kết quả và các con số: [RESULTS.md](RESULTS.md). Bot: [bot/README.md](bot/README.md).
+Repo `igod3011/for-fun`, nhánh `claude/mql5-market-product-5p7wht`. Mọi code nằm trong `memebot/`.
 
 ---
 
-## 1. Mục tiêu và trạng thái
+## 1. Mục tiêu và trạng thái (cập nhật 11/11/2026)
 
-**Mục tiêu cuối:** một bot chạy 24/7 tự mua, bán, cắt lỗ, chốt lời memecoin Solana (token vừa tốt nghiệp
-pump.fun lên PumpSwap), báo cáo và nhận lệnh qua Telegram, giao dịch bằng một ví riêng với số tiền nhỏ.
+**Mục tiêu cuối:** bot chạy 24/7 tự mua, bán, cắt lỗ, chốt lời memecoin Solana (token vừa tốt nghiệp pump.fun lên
+PumpSwap), điều khiển qua Telegram, giao dịch bằng một ví riêng với số tiền nhỏ.
 
-**Trạng thái hiện tại:**
-- Đang chạy **paper trading** (giả lập, không tiền thật, không ví, không private key) trên máy Windows của người dùng.
-- Bộ thu thập dữ liệu chạy song song từ 06/11/2026, khoảng 2.300 pool mỗi ngày.
-- **Chưa có phần giao dịch thật.** Chỉ thêm khi đạt các mốc ở mục 7.
-
-**Kết luận nghiên cứu quan trọng nhất đến nay:** mua mù quáng token vừa tốt nghiệp lỗ trung bình khoảng 75%.
-Cấu hình tốt nhất tìm được (vào lệnh sau 90 phút + bộ lọc + cắt lỗ chặt + trailing) dương khoảng +2 đến +3% mỗi
-lệnh trên dữ liệu kiểm tra, nhưng khoảng tin cậy 90% vẫn chứa 0, nên **chưa chứng minh được lợi thế**.
+**Trạng thái:**
+- Chỉ **paper trading**. Không có ví, private key hay lệnh thật. Chỉ thêm khi đạt mục 7.
+- Bộ thu thập chạy từ 06/11/2026, khoảng 2.300 pool mỗi ngày.
+- **Chưa có lợi thế.** Cấu hình hiện tại lỗ khoảng 17% mỗi lệnh ngoài mẫu (khoảng tin cậy 90% −30%..−0,4%), với phí
+  thật 1,2% mỗi swap. Sổ paper đầu tiên mất gần hết 1 SOL sau 15 lệnh; sổ mới mở ngày 11/11/2026.
+- Hai điều đã biết chắc: (1) 64% pool tốt nghiệp thật kết thúc bằng một giao dịch xả gần hết nguồn cung từ dàn ví;
+  (2) không quy tắc thoát nào cứu được, chỉ có thể tránh từ trước khi mua.
 
 ---
 
 ## 2. Kiến trúc
 
 ```
-                 GeckoTerminal (pool mới)          RPC công khai Solana (dự trữ pool, miễn phí)
-                          │                         Helius DAS (holder, chỉ pool tốt nghiệp thật)
-                          ▼                         RugCheck (dev, insider)
-  collector_daemon ──► collect.py ──► cohort.jsonl ◄── (ghi nhận mỗi 2 phút, điền nến mỗi 5 phút)
-                                          │
-              ┌───────────────────────────┼─────────────────────────────┐
-              ▼                           ▼                             ▼
-     report / healthcheck        ml/entry_timing (backtest,       bot/runner (paper, 24/7)
-     (tình trạng, baseline)      walk-forward grid, CI)           ├─ strategy.entry_check (lọc tĩnh)
-                                 ml/wallet_scores (ví giỏi)       ├─ chờ pool 90 phút tuổi + chặn dao rơi
-                                                                  ├─ intel: RugCheck + DexScreener
-                                                                  ├─ paper.buy (dự trữ thật, phí thật)
-                                                                  ├─ exit_decision mỗi 15 giây
-                                                                  └─ Telegram: tin nhắn + lệnh điều khiển
+   GeckoTerminal (pool mới, nến)      RPC công khai Solana (dự trữ, dự trữ ảo, quyền mint: miễn phí)
+   RugCheck (dev, cờ rủi ro)          Helius DAS (holder, chỉ pool tốt nghiệp thật: 10 credit/1000 ví)
+            │
+  collector_daemon ─► collect.py ─► cohort.jsonl        (một dòng ghi nhận mỗi pool, chỉ ghi nối)
+                                └─► cohort.fills.jsonl  (nến + kết quả sau ≥3 giờ, chỉ ghi nối)
+            │
+   ┌────────┴───────────────┬──────────────────────────────┐
+   ▼                        ▼                              ▼
+ report / healthcheck   ml/entry_timing (walk-forward)   bot/runner (paper, 24/7)
+ quote_check            ml/rc_rules (từng quy tắc)       ├─ entry_check: lọc tĩnh + lọc dàn ví
+                        ml/select_model (chọn token)     ├─ chờ 90 phút + chặn dao rơi
+                        ml/wallet_scores (ví giỏi)       ├─ ảnh holder lần hai + RugCheck/DexScreener
+                                                         ├─ paper.buy / exit_decision mỗi 15 giây
+                                                         └─ Telegram
 ```
 
-### Bản đồ module
 | File | Vai trò |
 |---|---|
-| `collect.py` | Tìm pool PumpSwap mới (GeckoTerminal), snapshot dự trữ, RugCheck lúc ghi nhận, điền nến 1 phút + snapshot lúc điền |
-| `collector_daemon.py` | Chạy `collect.py` mãi mãi: ghi nhận mỗi 2 phút, điền tối đa 20 pool mỗi 5 phút |
-| `rpc.py` | RPC Solana: công khai trước (miễn phí), Helius dự phòng; `pool_reserves()` đọc SOL và token của pool |
-| `helius.py` | Helius DAS (10 credit/lệnh): holder, top 10 địa chỉ, quyền mint/freeze; `--selftest`, `--inspect` |
-| `report.py` | Báo cáo cohort: pool chết, baseline lợi nhuận **thực rút được** (theo dự trữ thật), phân nhóm pool |
-| `healthcheck.py` | PASS/WARN/FAIL cho bộ thu thập; `--live` gọi thử API |
-| `ml/entry_timing.py` | Backtest thời điểm vào + quy tắc thoát; `--grid` walk-forward 480 cấu hình, bootstrap CI |
-| `ml/rc_rules.py` | Kiểm tra từng quy tắc RugCheck (lúc ghi nhận): nhóm bị loại so với nhóm giữ lại, hai nửa thời gian, CI |
-| `ml/wallet_scores.py` | Tìm ví "giỏi" và kiểm tra chúng có giữ được lợi thế ở giai đoạn sau không |
-| `ml/melt_data.py`, `ml/train_rug_model.py` | Nạp an toàn bộ dữ liệu MELT (41k token) và mô hình phát hiện rug (AUROC 0,90) |
+| `store.py` | Lưu trữ: đọc/ghi `cohort.jsonl` và `cohort.fills.jsonl`, gộp khi đọc, `--migrate`, `--stats` |
+| `collect.py` | Một lượt ghi nhận hoặc một lượt điền kết quả (do daemon gọi) |
+| `collector_daemon.py` | Ghi nhận mỗi 2 phút (tính từ đầu lượt), xen kẽ các lượt điền nhỏ (8 pool) |
+| `rpc.py` | RPC Solana, công khai trước, Helius dự phòng: dự trữ pool, dự trữ ảo của pool, quyền mint/freeze |
+| `helius.py` | Helius DAS: số holder, top 10 địa chỉ; `--selftest`, `--inspect` |
+| `quote_check.py` | So công thức swap của bot với báo giá Jupiter qua đúng pool đó (chỉ báo giá) |
+| `report.py`, `healthcheck.py` | Báo cáo cohort; PASS/WARN/FAIL cho bộ thu thập và bot |
+| `ml/entry_timing.py` | Backtest thời điểm vào + quy tắc thoát; `--grid` walk-forward, `--bot-filter`, `--stop-fill` |
+| `ml/rc_rules.py` | Từng quy tắc RugCheck/holder: nhóm bị loại so với nhóm giữ lại, hai nửa thời gian, có CI |
+| `ml/select_model.py` | Hồi quy logistic dự đoán pool sống sót từ đặc trưng lúc ghi nhận, chia theo thời gian |
+| `ml/wallet_scores.py` | Tìm ví "giỏi" và kiểm tra ngoài mẫu |
+| `ml/melt_data.py`, `ml/train_rug_model.py` | Bộ dữ liệu MELT bên ngoài (cần lightgbm; không thuộc phần chạy thật) |
+| `bot/amm.py` | Toán swap: `(SOL thật + dự trữ ảo) × token`, phí 1,2% |
 | `bot/config.py` | Toàn bộ tham số bot (ghi đè bằng `bot_config.json`) |
-| `bot/strategy.py` | Hàm thuần: `entry_check`, `exit_decision`, `chase_check`, `Position` |
-| `bot/amm.py` | Toán swap trên dự trữ thật, có dự trữ ảo của pool pump.fun (`PUMP_VIRTUAL_SOL` = 17,584 SOL) |
-| `bot/paper.py` | Danh mục paper: số dư, vị thế, phí, giới hạn rủi ro, lưu trạng thái, nhật ký quyết định |
-| `bot/intel.py` | RugCheck + DexScreener trước khi mua; định dạng giá, vốn hóa |
-| `bot/runner.py` | Vòng lặp chính, Telegram, follow ví, báo cáo ngày |
-| `bot/telegram.py` | Client Telegram (stdlib), `--whoami` lấy chat id |
-| `bot/review.py` | Tổng hợp `bot_trades.jsonl` (lệnh `/review`) |
-| `bot/wallets.py` | Theo dõi ví theo thời gian thực (follow mode, tắt mặc định) |
-| `restart_collector.bat`, `start_bot.bat` | Khởi động lại bộ thu thập / bot trên Windows (chỉ dừng đúng tiến trình của nó) |
-| `tests/` | 80 test, chạy bằng `python -m unittest discover -s memebot/tests -t .` |
-| `anomaly.py`, `backtest.py`, `broker.py`, `engine.py`, `strategy.py`, `synthetic.py`, `live.py`, `realtest.py`, `models.py`, `config.py` (gốc) | **Bản thử nghiệm đầu tiên** (dữ liệu giả lập, DexScreener). Giữ để tham khảo, không dùng cho bot hiện tại |
+| `bot/strategy.py` | Hàm thuần: `entry_check`, `farm_reasons`, `exit_decision`, `Position` |
+| `bot/paper.py`, `bot/reset_paper.py` | Sổ paper, nhật ký quyết định; mở sổ mới (lưu sổ cũ vào `archive/`) |
+| `bot/intel.py`, `bot/runner.py`, `bot/telegram.py`, `bot/review.py`, `bot/wallets.py` | Kiểm tra trước khi mua, vòng lặp chính, Telegram, tổng hợp nhật ký, theo ví |
+| `*.bat` | `restart_collector`, `start_bot`, `reset_paper`, `migrate_store` (Windows) |
+| `tests/` | 96 test: `python -m unittest discover -s memebot/tests -t .` |
 
-### Nguyên tắc thiết kế
-- **Chỉ dùng thư viện chuẩn Python 3.9+** cho bot và bộ thu thập, để chạy được trên Windows và Linux (VPS) không cần cài gì.
-- **Lợi nhuận luôn tính bằng số SOL thật rút được từ pool** (`bot/amm.py`: dự trữ thật cộng dự trữ ảo 17,584 SOL
-  của pool pump.fun), không dùng giá giao dịch cuối (GeckoTerminal có giá ảo khi pool cạn).
-- **Không nhìn trước tương lai:** không dùng dữ liệu biết được sau thời điểm quyết định (đã từng mắc lỗi này: lọc
-  theo thanh khoản lúc thu thập cho kết quả giả +250%).
-- **Đánh giá walk-forward:** chọn trên dữ liệu cũ, kiểm tra trên dữ liệu mới; luôn kèm khoảng tin cậy.
-- **Mọi quyết định của bot đều ghi kèm lý do** (`bot_trades.jsonl`).
+### Nguyên tắc
+- **Chỉ thư viện chuẩn Python 3.9+** cho phần chạy thật.
+- **Lợi nhuận = số SOL pool thật sự trả** (`bot/amm.py`), không dùng giá giao dịch cuối. Pool do pump.fun migrate
+  định giá theo `(SOL thật + dự trữ ảo) × token`. Dự trữ ảo **khác nhau theo pool** (đa số khoảng 17,56 SOL, có pool
+  15,3 / 11,2 / 2,9; pool không do migrate là 0) nên luôn dùng giá trị đọc on-chain của chính pool đó.
+- **Không nhìn trước tương lai.** Chỉ dùng thông tin có tại thời điểm quyết định.
+- **Walk-forward, có khoảng tin cậy.** Một quy tắc chỉ được giữ nếu tốt hơn khi không có nó trên cùng dữ liệu, ở cả
+  hai nửa thời gian.
+- **Mọi quyết định của bot đều ghi kèm lý do** và đủ số liệu để mô phỏng lại (`bot_trades.jsonl`).
 
 ---
 
-## 3. Cài đặt và chạy
+## 3. Cài đặt và chạy (Windows, Command Prompt)
 
-### Windows (đang dùng)
-Yêu cầu: Python 3.9+ ("Add python.exe to PATH" khi cài). Không cần cài thư viện nào.
 ```
 cd C:\Users\PC1433\memebot\for-fun-claude-mql5-market-product-5p7wht
 set HELIUS_API_KEY=...
@@ -90,200 +85,110 @@ memebot\restart_collector.bat
 memebot\start_bot.bat
 python -m memebot.healthcheck
 ```
-- Lấy chat id: gửi `hi` cho bot trong Telegram, rồi `python -m memebot.bot.telegram --whoami` (khi bot đang dừng).
-- Cập nhật code: tải zip của nhánh, giải nén đè (giữ nguyên các file dữ liệu):
-  `powershell -Command "Invoke-WebRequest -Uri 'https://github.com/igod3011/for-fun/archive/refs/heads/claude/mql5-market-product-5p7wht.zip' -OutFile code.zip; Expand-Archive code.zip -DestinationPath .. -Force"`
-- **Cảnh báo (11/11/2026):** thư mục trên máy không phải repo git và đang có các sửa đổi chưa đẩy lên nhánh
-  (AMM dự trữ ảo, `--stop-fill`, `ml/rc_rules.py`, các sửa lỗi bot). Lệnh tải zip ở trên sẽ **ghi đè mất** chúng.
-  Đừng chạy lệnh đó cho đến khi các thay đổi này đã được đưa lên GitHub.
-- Biến môi trường chỉ sống trong cửa sổ đó. Máy khởi động lại thì phải đặt lại và chạy lại hai file `.bat`.
+- Biến môi trường chỉ sống trong cửa sổ đó; máy khởi động lại thì đặt lại và chạy lại hai file `.bat`.
+- Lấy chat id: gửi `hi` cho bot, rồi `python -m memebot.bot.telegram --whoami` (khi bot đang dừng).
+- Mở sổ paper mới: `memebot\reset_paper.bat`, rồi `memebot\start_bot.bat`.
 - Giữ máy không ngủ: `powercfg /change standby-timeout-ac 0`.
+- **Cập nhật code bằng git, không tải zip đè lên nữa** (thư mục đã là repo git từ 11/11/2026; tải zip sẽ ghi đè
+  mất các thay đổi chưa đẩy lên).
+- Linux/VPS: `export` ba biến, chạy hai lệnh `python3 -m memebot.collector_daemon --out cohort.jsonl` và
+  `python3 -m memebot.bot.runner` dưới systemd.
 
-### Linux / VPS (dự kiến)
-```
-export HELIUS_API_KEY=... TELEGRAM_BOT_TOKEN=... TELEGRAM_CHAT_ID=...
-nohup python3 -m memebot.collector_daemon --out cohort.jsonl > daemon.log 2> daemon.err &
-nohup python3 -m memebot.bot.runner > bot.log 2> bot.err &
-```
-Nên dùng systemd để tự khởi động lại. Không ghi key vào file trong repo.
+**Lệnh Telegram:** `/status`, `/positions`, `/review [giờ]`, `/pause`, `/resume`, `/sellall`, `/stop`, `/help`.
 
-### Lệnh Telegram
-`/status`, `/positions`, `/review [giờ]`, `/pause`, `/resume`, `/sellall`, `/stop`, `/help`.
-Bot chỉ nghe đúng `TELEGRAM_CHAT_ID`.
-
-### Chi phí API
-- Helius gói miễn phí: 1 triệu credit/tháng. DAS = 10 credit, RPC thường = 1 credit. Sau tối ưu, khoảng 5–12 nghìn credit/ngày
-  (trước tối ưu khoảng 100 nghìn/ngày). Kiểm tra dashboard Helius định kỳ.
-- GeckoTerminal, RugCheck, DexScreener, RPC công khai Solana: miễn phí, có giới hạn tốc độ (code đã giãn cách và thử lại).
+**Chi phí API:** Helius miễn phí 1 triệu credit/tháng; DAS = 10 credit cho mỗi 1.000 ví. Mỗi pool tốt nghiệp thật
+tốn 10–20 credit lúc ghi nhận, cộng 10–20 credit cho mỗi ứng viên bot xét mua. Mọi thứ khác (dự trữ, dự trữ ảo, quyền
+mint, GeckoTerminal, RugCheck, DexScreener, báo giá Jupiter) miễn phí và có giới hạn tốc độ.
 
 ---
 
-## 4. Dữ liệu
+## 4. Dữ liệu (trên máy chạy bot, không có trong git)
 
-Tất cả nằm trên máy chạy bot, trong thư mục code (không có trong git).
-
-| File | Nội dung | Ghi bởi |
-|---|---|---|
-| `cohort.jsonl` | Mỗi dòng một pool PumpSwap mới (xem schema dưới). Khoảng 2.300 pool/ngày, khoảng 10 MB/ngày | bộ thu thập |
-| `daemon.log`, `daemon.err` | Nhật ký bộ thu thập (`pages cover X min` = độ phủ) | bộ thu thập |
-| `bot_trades.jsonl` | Mọi quyết định của bot: `buy`, `sell`, `skip` + lý do, giá, MC, PnL | bot |
-| `bot_series.jsonl` | Dự trữ pool của các vị thế mỗi 15 giây (để mô phỏng lại quy tắc thoát) | bot |
-| `bot_state.json` | Số dư, vị thế đang mở, token đã xét (để khởi động lại không mất gì) | bot |
-| `bot.log`, `bot.err` | Nhật ký bot | bot |
-| `smart_wallets.json` | Kết quả `wallet_scores` (danh sách ví + kết luận PASS/FAIL) | `ml/wallet_scores` |
-
-### Schema một dòng `cohort.jsonl`
-```
-pool, mint, name, created (unix giây, lúc tạo pool), reserve_usd, fdv_usd, registered_at
-helius_reg:  pool_sol, pool_tokens, fetched_at            (mọi pool, RPC miễn phí)
-             holders, top1/5/10/20_pct, pool_pct,         (chỉ pool tốt nghiệp thật, Helius DAS)
-             top_holders [[địa chỉ, tỷ lệ], ...], mint_authority, freeze_authority
-rc_reg:      creator, dev_pct, creator_rugs, creator_launches, insider_pct, insiders_detected, risks
-             (RugCheck lúc ghi nhận, chỉ pool tốt nghiệp thật, từ bản 11/2026)
-candles:     [[ts, open, high, low, close, volume_usd], ...]   1 phút, GeckoTerminal, điền khi pool ≥3 giờ tuổi
-rugcheck:    tóm tắt RugCheck lúc điền nến
-helius_fill: pool_sol, pool_tokens, fetched_at             (snapshot dự trữ lúc điền nến = kết quả thật)
-fetched_at
-```
-"Pool tốt nghiệp thật" (canonical): mint kết thúc bằng `pump` và k = SOL × token trong 1,0–2,6 × 10¹⁰
-(bộ thu thập dùng khoảng rộng hơn 0,5–5 × 10¹⁰ để lấy dữ liệu holder).
-
-### Chia sẻ dữ liệu để phân tích
-Nén `cohort.jsonl` và `bot_*.jsonl` thành zip (giảm khoảng 90%), tải lên Google Drive chế độ "Anyone with the link",
-gửi link. Không gửi các file `.err`/`.log` nếu chúng có thể chứa thông tin cá nhân.
-
----
-
-## 5. Kết quả đến hiện tại
-
-### Nghiên cứu bên ngoài
-- MELT (41.470 token pump.fun, 12/2024–3/2025): 84% rủi ro cao; trung vị lợi nhuận sau migration −68%.
-  Mô hình LightGBM chia theo thời gian: AUROC 0,90; lọc rug cải thiện trung vị nhưng trung bình vẫn âm.
-- Đặc trưng mạnh nhất: tập trung nắm giữ sau khi gộp ví bundle.
-
-### Dữ liệu tự thu (khoảng 7.000 pool trong 3 ngày đầu)
-| Chỉ số | Giá trị |
+| File | Nội dung |
 |---|---|
-| Pool chết (<30 phút giao dịch trong 3 giờ đầu) | 68% |
-| Pool đã cạn ngay lúc ghi nhận (<1 SOL) | 31% |
-| Pool PumpSwap không phải pump.fun | 3.393 pool, trung bình −98,4%, 0% có lãi |
-| Pool giả cho mint pump.fun thật | 148 pool, −100% |
-| **Pool tốt nghiệp thật, mua mù và giữ ≥3 giờ** | 811 pool, **trung bình −75,2%, 12% có lãi** |
-| Cờ `rugged` của RugCheck | 0/6.794: vô dụng làm nhãn |
+| `cohort.jsonl` | Một dòng ghi nhận mỗi pool PumpSwap mới; chỉ ghi nối |
+| `cohort.fills.jsonl`, `cohort.filled.txt` | Kết quả sau ≥3 giờ (nến, RugCheck, dự trữ) và chỉ mục pool đã điền |
+| `bot_trades.jsonl`, `bot_series.jsonl`, `bot_state.json` | Nhật ký quyết định, dự trữ mỗi 15 giây của vị thế, trạng thái |
+| `archive/<ngày>/` | Các sổ paper cũ |
+| `daemon.log`, `bot.log`, `*.err` | Nhật ký |
 
-### Backtest thời điểm vào và quy tắc thoát (lợi nhuận thực rút được, phí 0,5%/swap + 0,0003 SOL/giao dịch)
-- Giữ lệnh đến 3 giờ: −40% đến −74% ở mọi cấu hình. **Bắt buộc phải có quy tắc thoát.**
-- Chặn dao rơi (≥40 SOL, SOL không giảm >20% từ lúc ghi nhận) cải thiện nhất quán ở cả hai nửa dữ liệu.
-- Bộ lọc lực mua (giá không thấp hơn 10 phút trước) không thêm giá trị.
-- Walk-forward 480 cấu hình (921 pool, lệnh 0,2 SOL):
-
-| Cấu hình | TEST | Khoảng tin cậy 90% |
-|---|---|---|
-| Cũ: vào +60 phút, SL 25%, chốt lời 50%@+50%/+100%, trailing 20% sau +30%, giữ 120 phút | −7,0% | −10,7%..−3,1% (chắc chắn lỗ) |
-| **Hiện tại: vào +90 phút, SL 10%, không chốt lời cố định, trailing 10% sau +20%, giữ 60 phút** | +1,8% | −1,9%..+6,3% |
-| Hiện tại + bỏ token đã tăng >80% trong 1 giờ | **+3,1%** (n=63, thắng 52%) | −1,2%..+7,9% |
-
-**Đính chính 11/11/2026: các số TEST trong bảng trên quá lạc quan.** Backtest cũ coi cắt lỗ khớp đúng tại mức stop
-khi giá xuyên qua nó trong một nến 1 phút. Thực tế rug là một giao dịch duy nhất: bot paper (15 lệnh, −0,998 SOL,
-hết vốn ngày 10/11) bị khớp cắt lỗ ở −88% đến −100% trong 4/9 lệnh 0,2 SOL. Từ 11/11 mặc định `--stop-fill close`
-(khớp không tốt hơn giá đóng nến); `low` = cận bi quan; `stop` = mô hình cũ. Chạy lại trên 1.306 pool, cấu hình
-hiện tại (+90 phút, SL 10%, trailing 10% sau +20%, giữ 60 phút, bỏ >+80%/1 giờ), n=105 lệnh TEST:
-
-| Cách khớp cắt lỗ | Train | TEST | Khoảng tin cậy 90% |
-|---|---|---|---|
-| `stop` (cũ, lạc quan) | +9,2% | +0,2% | −6,2%..+10,0% |
-| **`close` (mặc định mới)** | +2,7% | **−28,3%** | −38,6%..−16,2% (chắc chắn lỗ) |
-| `low` (bi quan) | +2,0% | −29,8% | −40,3%..−17,6% |
-
-Kết luận: **không cấu hình nào trong 480 cấu hình có lợi thế**; quy tắc thoát không cứu được rug. Lợi thế, nếu có,
-phải đến từ việc chọn token (tránh rug trước khi mua), không phải từ điểm vào hay mức cắt lỗ.
-
-### Rà soát toàn dự án 11/11/2026 (chi tiết: `AUDIT_2026-11-11.html` ở thư mục gốc)
-- **Công thức AMM đã sai từ đầu, nay đã sửa.** Pool PumpSwap do pump.fun migrate định giá theo
-  `(SOL thật + dự trữ ảo) × token = K`, không phải `SOL thật × token`. Dự trữ ảo nằm trong tài khoản pool (u64 lamports
-  tại byte 245), bằng 17,584 SOL ở mọi pool đã kiểm tra on-chain; 1.183 pool trong cohort cho trung vị 17,42 SOL.
-  `bot/amm.py` nhận tham số `virt`; bot, backtest và báo cáo đều dùng `PUMP_VIRTUAL_SOL`.
-- **"Rug" trong dữ liệu là xả hàng, không phải rút thanh khoản.** LP của pool migrate đã bị đốt (LP mint supply = 0).
-  64% pool tốt nghiệp thật (840/1.308) kết thúc bằng một giao dịch bán gần như toàn bộ nguồn cung: pool còn khoảng
-  0,45 SOL và 98% nguồn cung. Đó là dàn ví (trung vị 2.004 holder chỉ 5 phút sau khi tạo, top 10 chỉ 25%).
-- Sau khi sửa AMM, cấu hình hiện tại vẫn **−28,1% trên TEST** (n=106, khoảng tin cậy 90% −38,1%..−16,5%).
-- **Quy tắc top 10 >50% của bot đang loại nhầm nhóm tốt hơn:** nhóm bị loại −4% so với nhóm giữ lại −22% (lệnh kiểu
-  bot, n=120/97), ngược chiều ở cả hai nửa, khoảng tin cậy của chênh lệch −35%..−3%. Theo quy tắc của dự án thì phải bỏ.
-- **Ứng viên bộ lọc mới (chưa bật):** bỏ pool có ≥1.000 holder lúc ghi nhận hoặc top 10 <15%. Lệnh kiểu bot:
-  bị loại −25% (n=83), giữ lại −4% (n=134), cùng chiều ở hai nửa, khoảng tin cậy chênh lệch +8%..+38%.
-  **Nhóm giữ lại vẫn âm**: bộ lọc giảm lỗ chứ chưa tạo ra lợi thế.
-
-- Lệnh 0,2 SOL tốt hơn 0,05 SOL vì phí cố định chiếm 0,3% thay vì 1,2% mỗi vòng.
-- Quy tắc dev >3%, dev từng rug, insider >10%: **đã backtest sơ bộ 11/11/2026** bằng `ml/rc_rules.py` trên 345 pool
-  tốt nghiệp thật có `rc_reg` (09–11/11, chỉ 2 ngày):
-  - Ba quy tắc gần như không bao giờ kích hoạt: dev >3% = 0 pool, insider >10% = 0 pool (trường `insider_pct` luôn
-    bằng 0, nhiều khả năng RugCheck không điền cờ `insider` cho top holder), dev từng rug = 16 pool nhưng 0 pool trong
-    74 lệnh bot sẽ vào. Nhật ký bot thật cũng không có lần bỏ qua nào vì ba quy tắc này. **Chúng vô hại nhưng không
-    lọc được gì.**
-  - Thăm dò (mua lúc ghi nhận, giữ đến lúc điền): cờ `High holder correlation` (101 pool: −97% so với −68% khi
-    không có cờ, khoảng tin cậy 90% của chênh lệch +15%..+45%, cùng chiều ở hai nửa) và `Large Amount of LP Unlocked`
-    (31 pool, −100%; nhưng chặn dao rơi đã loại hết). Trên 74 lệnh kiểu bot: có cờ correlation −50% (n=26), không có
-    −25% (n=48), chưa đủ mẫu để kết luận và **nhóm tốt hơn vẫn âm**.
-  - 17 quy tắc được thử cùng lúc nên một "KEEP" vẫn có thể là may rủi; cần chạy lại khi có thêm dữ liệu.
-
-### Đánh giá các nguồn khác
-- GMGN: API phải xin duyệt; phí 1%/lệnh; dùng để tham khảo thủ công.
-- TradingAgents (tauricresearch): khung LLM nhiều tác tử cho cổ phiếu/BTC theo ngày, quá chậm và tốn cho memecoin;
-  học được: cổng duyệt rủi ro tách biệt, kỷ luật chống nhìn trước tương lai, nhật ký quyết định có chấm điểm.
-- Video TikTok "Grok Bot": quảng bá, không kiểm chứng được, lợi nhuận phi lý; chỉ lấy ý tưởng quy tắc lọc.
+```
+cohort.jsonl:        pool, mint, name, created, reserve_usd, fdv_usd, registered_at
+  helius_reg:        pool_sol, pool_tokens, fetched_at                        (mọi pool, RPC miễn phí)
+                     virt_sol, mint_authority, freeze_authority              (pool tốt nghiệp thật, RPC miễn phí, từ 11/11)
+                     holders, top1/5/10/20_pct, pool_pct, top_holders, accounts_fetched   (Helius DAS)
+  rc_reg:            creator, dev_pct, creator_rugs, creator_launches, insider_pct, insiders_detected, risks
+cohort.fills.jsonl:  pool, candles [[ts, o, h, l, c, volume_usd]], rugcheck, helius_fill {pool_sol, pool_tokens}, fetched_at
+```
+- Dòng cũ (trước 11/11/2026) chứa luôn nến trong `cohort.jsonl`; `store.load()` đọc được cả hai dạng.
+  Chạy `memebot\migrate_store.bat` một lần để tách chúng ra (51 MB → 6 MB) và bật lịch thu thập mới.
+- "Pool tốt nghiệp thật": mint kết thúc bằng `pump` và SOL × token trong 1,0–2,6 × 10¹⁰.
+- `holders` bị chặn ở 2 trang (2.000 ví): từ 1.000 trở lên đã là dấu hiệu dàn ví.
+- Chia sẻ dữ liệu: nén `cohort*.jsonl` và `bot_*.jsonl`, tải lên Google Drive, gửi link. Không gửi `.log`/`.err`.
 
 ---
 
-## 6. Cách đánh giá hiệu quả
+## 5. Cấu hình bot hiện tại
+
+1. **Lọc tĩnh lúc ghi nhận:** mint pump.fun, pool tốt nghiệp thật, ≥40 SOL, không còn quyền mint/freeze, ghi nhận
+   ≤15 phút sau khi tạo, **không phải dàn ví** (dưới 1.000 holder và top 10 từ 15% trở lên).
+2. **Chờ pool 90 phút tuổi** (cửa sổ 30 phút), pool còn ≥40 SOL và SOL không giảm quá 20% từ lúc ghi nhận.
+3. **Ảnh holder lần hai** (ghi lại, chưa dùng làm quy tắc), rồi RugCheck/DexScreener: dev >3%, dev từng rug, đã tăng
+   >80% trong 1 giờ thì bỏ.
+4. **Mua giả lập 0,2 SOL**, phí 1,2% mỗi swap + 0,0003 SOL mỗi giao dịch.
+5. **Thoát:** cắt lỗ 10%, trailing 10% sau +20%, giữ tối đa 60 phút.
+
+Đã bỏ: quy tắc top 10 >50% (loại nhầm nhóm tốt hơn), quy tắc insider (không bao giờ kích hoạt), chế độ mua đuổi.
+
+---
+
+## 6. Cách đánh giá
 
 | Tần suất | Lệnh | Nhìn vào đâu |
 |---|---|---|
-| Hằng ngày | `/status` (Telegram) | Bot còn chạy, PnL ngày |
-| Hằng ngày | `python -m memebot.healthcheck` | `0 fail`; `pages cover` ≥6 phút; `overdue` gần 0 |
-| Hằng tuần | `python -m memebot.ml.entry_timing --data cohort.jsonl --grid --stake 0.2 --max-h1 0.8` | Dòng `NEW bot rules`: TEST và **khoảng tin cậy 90%** |
-| Hằng tuần | `/review 168` | Số lệnh đóng, PnL, tỷ lệ thắng, PnL theo từng lý do thoát |
-| Hằng tuần | `python -m memebot.ml.rc_rules --data cohort.jsonl --stake 0.2 --max-h1 0.8` | Cột `verdict`: `KEEP` phải lặp lại qua các tuần mới đáng tin |
-| Sau 5–7 ngày có địa chỉ ví | `python -m memebot.ml.wallet_scores --data cohort.jsonl` | `PASS` hay `FAIL` |
-| Khi cần | `python -m memebot.report cohort.jsonl` | Baseline `REALIZABLE` theo nhóm pool |
-| Hằng ngày | Dashboard Helius | Credit dùng mỗi ngày (mục tiêu ≤ 25 nghìn) |
+| Hằng ngày | `/status`; `python -m memebot.healthcheck` | `0 fail`; bot còn vốn |
+| Hằng tuần | `python -m memebot.ml.entry_timing --data cohort.jsonl --grid --stake 0.2 --max-h1 0.8 --bot-filter` | Dòng `NEW bot rules`: TEST và khoảng tin cậy 90% |
+| Hằng tuần | `python -m memebot.ml.rc_rules --data cohort.jsonl --stake 0.2 --max-h1 0.8` | Cột `verdict`; `KEEP` phải lặp lại qua các tuần |
+| Hằng tuần | `python -m memebot.ml.select_model --data cohort.jsonl` | AUC trên TEST; trung bình nhóm `kept` và khoảng tin cậy của nó |
+| Hằng tuần | `/review 168` | Số lệnh đóng, PnL, PnL theo lý do thoát |
+| Hằng tuần | `python -m memebot.quote_check` | Phí suy ra phải gần 1,2%; không có `NO SELL QUOTE` |
+| Từ 15–16/11 | `python -m memebot.ml.wallet_scores --data cohort.jsonl` | `PASS` hay `FAIL` |
 
-**Cách đọc:**
-- Chỉ số TEST trong walk-forward là thước đo duy nhất về tương lai. Train luôn đẹp hơn.
-- Khoảng tin cậy chứa 0 nghĩa là chưa phân biệt được với may rủi.
-- Kết quả paper phải gần với backtest. Nếu paper tệ hơn nhiều: độ trễ, trượt giá, hoặc khác biệt mô phỏng.
-- Mọi bộ lọc mới phải tốt hơn khi không có nó **trên cùng dữ liệu**, ở cả hai nửa thời gian.
+Trong Claude Code có thể gọi skill `/weekly-eval` để chạy và tóm tắt tất cả.
+
+**Cách đọc:** chỉ số TEST mới nói về tương lai. Khoảng tin cậy chứa 0 nghĩa là chưa phân biệt được với may rủi.
+Kết quả paper phải gần backtest; lệch nhiều là mô phỏng đang sai ở đâu đó.
 
 ---
 
-## 7. Mốc quyết định trước khi dùng tiền thật (cần đạt cả ba)
+## 7. Mốc trước khi dùng tiền thật (cần cả ba)
 1. Khoảng tin cậy 90% của cấu hình bot trên TEST **nằm hoàn toàn trên 0**, với ít nhất 200 lệnh TEST.
 2. Bot paper có **ít nhất 100 lệnh đóng** với PnL dương sau phí.
-3. Kết quả paper gần với backtest.
+3. Kết quả paper gần với backtest, và `quote_check` khớp.
 
-Khi đạt: thêm thực thi qua Jupiter Swap API, ký giao dịch tại máy, **ví riêng** (tài khoản Phantom mới, chỉ nạp số tiền
-chấp nhận mất), private key chỉ trong biến môi trường, lệnh nhỏ, giới hạn lỗ ngày chặt, kill switch qua Telegram.
-Nếu sau 2–3 tuần khoảng tin cậy vẫn chứa 0 hoặc paper âm: dừng ở mức công cụ nghiên cứu, không dùng tiền thật.
+Khi đạt: thực thi qua Jupiter Swap API, ký tại máy, **ví riêng** chỉ nạp số tiền chấp nhận mất, private key chỉ trong
+biến môi trường, lệnh nhỏ, giới hạn lỗ ngày chặt, kill switch qua Telegram.
+**Điểm dừng:** nếu đến cuối tháng 11/2026 khoảng tin cậy vẫn chứa 0 hoặc paper âm, dừng ở mức công cụ nghiên cứu.
 
 ---
 
 ## 8. Giới hạn đã biết
-- Giá lúc vào trong backtest suy ra từ nến GeckoTerminal + tích số dự trữ; sai nếu thanh khoản bị rút trước lúc vào.
-- Quy tắc thoát mô phỏng trên giá đóng cửa từng phút; bot thật kiểm tra mỗi 15 giây. Cắt lỗ trong nến khớp theo
-  `--stop-fill` (mặc định `close`); backtest chưa áp dụng các bộ lọc RugCheck/DexScreener mà bot dùng.
-- Bộ thu thập có thể sót pool khi 200 pool mới nhất phủ dưới khoảng 4 phút (sót ngẫu nhiên, không làm lệch kết quả).
-- Dự trữ ảo dùng hằng số 17,584 SOL, chưa đọc theo từng pool; nếu pump.fun đổi giá trị này thì mọi phép tính lệch.
-  Phí swap 0,5% là giả định, chưa đối chiếu với báo giá thật.
-- Một giai đoạn thị trường (11/2026). Chưa có MEV, giao dịch thất bại, honeypot chặn bán trong mô phỏng.
-- RPC công khai Solana không cam kết ổn định; có Helius dự phòng.
+- Giá vào trong backtest suy ra từ nến GeckoTerminal; quy tắc thoát mô phỏng trên nến 1 phút, bot thật kiểm tra mỗi
+  15 giây. Cắt lỗ trong nến khớp theo `--stop-fill` (mặc định không tốt hơn giá đóng nến).
+- Dự trữ ảo trong backtest lấy lúc ghi nhận và coi là không đổi; pool ghi nhận trước 11/11 dùng 17,584 SOL.
+- Phí 1,2% đo ở vốn hóa 250–1.500 SOL; ở vốn hóa cao hơn phí thấp hơn một chút (chưa mô hình hóa).
+- Backtest không áp dụng các kiểm tra RugCheck/DexScreener lúc mua (chỉ có `--max-h1`).
+- Chưa mô phỏng trượt giá do cạnh tranh, giao dịch thất bại, MEV, phí ưu tiên lúc thị trường nóng.
+- Mới một giai đoạn thị trường (11/2026), một tuần dữ liệu.
 
-## 9. Lộ trình
-1. Tiếp tục thu thập 2–3 tuần; đánh giá hằng tuần (mục 6).
-2. Backtest quy tắc dev/bundle khi có đủ `rc_reg`; chạy `wallet_scores`; nếu PASS thì bật follow mode (paper).
-3. Mô hình chọn token trên đặc trưng lúc ghi nhận (holder, dev, insider, dự trữ), chia theo thời gian.
+## 9. Việc tiếp theo
+1. Thu thập tiếp; đánh giá hằng tuần (mục 6). Sổ paper mới là phép thử ngoài mẫu của bộ lọc dàn ví.
+2. Khi có 1–2 tuần dữ liệu ảnh holder lần hai: kiểm tra tốc độ tăng holder có tách được pool bị xả không.
+3. `wallet_scores` từ 15–16/11; chỉ bật theo ví (paper) nếu `PASS`.
 4. Chuyển lên VPS (systemd) khi cấu hình ổn định.
-5. Chỉ khi đạt mục 7: thêm thực thi thật với ví riêng và tiền nhỏ.
+5. Chỉ khi đạt mục 7: thêm thực thi thật.
 
 ## 10. An toàn
 - Không bao giờ dán private key, token Telegram hay key Helius vào chat hoặc commit vào git.
-- Không chạy bot "miễn phí" lạ trên GitHub/Telegram trên máy có ví thật (đã có vụ repo giả đánh cắp ví).
-- Mọi file `.pkl` tải từ internet chỉ nạp qua unpickler giới hạn (`ml/melt_data.py`).
+- Không chạy bot "miễn phí" lạ trên máy có ví thật.
+- File `.pkl` tải từ internet chỉ nạp qua unpickler giới hạn (`ml/melt_data.py`).
