@@ -24,8 +24,8 @@ from ..bot import amm
 from ..bot.config import BotConfig
 from ..bot.strategy import entry_check
 
-STAKE, FEE = 0.05, 0.005
-VIRT = amm.PUMP_VIRTUAL_SOL   # virtual quote reserve of pump.fun-migrated pools: price = (SOL + VIRT) / tokens
+STAKE, FEE = 0.05, amm.PUMP_FEE     # 1.2% per swap, measured from real quotes (memebot.quote_check)
+VIRT = amm.PUMP_VIRTUAL_SOL   # fallback virtual reserve; rows collected since 11/2026 carry their pool's own value
 TX_FEE = 0.0          # SOL per transaction (priority + base fee); set from the command line (default 0.0003)
 TP = [(0.5, 0.5), (1.0, 0.5)]
 SL, TRAIL_ON, TRAIL, MAX_HOLD = 0.25, 0.3, 0.2, 120
@@ -53,14 +53,16 @@ def setup(p):
     usd_reg = close_at(c, t_reg, tol=300)
     if not c or not usd_reg:
         return None
-    # k and the USD->SOL conversion use the pool's real invariant (real SOL + virtual reserve) x tokens
-    return {"c": c, "k": (s0 + VIRT) * t0, "s0": s0, "t0": t0, "s1": s1, "t1": t1, "t_reg": t_reg,
-            "conv": usd_reg / amm.price(s0, t0, VIRT), "t_fill": f.get("fetched_at") or p.get("fetched_at")}
+    # k and the USD->SOL conversion use the pool's real invariant (real SOL + virtual reserve) x tokens; the
+    # virtual reserve is the pool's own (read on-chain at registration) and assumed constant until fill
+    v = amm.row_virt(p, VIRT)
+    return {"c": c, "k": (s0 + v) * t0, "v": v, "s0": s0, "t0": t0, "s1": s1, "t1": t1, "t_reg": t_reg,
+            "conv": usd_reg / amm.price(s0, t0, v), "t_fill": f.get("fetched_at") or p.get("fetched_at")}
 
 
-def buy_at(s_e, t_e):
-    """Tokens bought with STAKE at real reserves (s_e, t_e)."""
-    return amm.buy(STAKE, s_e, t_e, FEE, VIRT)
+def buy_at(s_e, t_e, v=VIRT):
+    """Tokens bought with STAKE at real reserves (s_e, t_e) of a pool with virtual reserve v."""
+    return amm.buy(STAKE, s_e, t_e, FEE, v)
 
 
 MAX_H1 = None        # skip entries already up more than this over the previous hour (e.g. 0.8); --max-h1
@@ -75,8 +77,8 @@ def entry(S, created, delay_min, guard, momentum, max_h1=None):
         return None                                       # nothing traded around te: dead, cannot enter
     p_sol = usd / S["conv"]
     s_eff, t_e = math.sqrt(S["k"] * p_sol), math.sqrt(S["k"] / p_sol)
-    s_e = s_eff - VIRT                                    # REAL pool SOL: what the bot reads and applies its guard to
-    if s_eff > 5 * (S["s0"] + VIRT) or s_e <= 0:
+    s_e = s_eff - S["v"]                                  # REAL pool SOL: what the bot reads and applies its guard to
+    if s_eff > 5 * (S["s0"] + S["v"]) or s_e <= 0:
         return None                                       # implausible price (data glitch)
     if guard:
         if s_e < 40 or (te >= S["t_reg"] and s_e < 0.8 * S["s0"]):
@@ -95,7 +97,7 @@ def entry(S, created, delay_min, guard, momentum, max_h1=None):
 
 
 def exit_hold(S, q):
-    return amm.sell(q, S["s1"], S["t1"], FEE, VIRT) - (TX_FEE if q > 0 else 0.0)
+    return amm.sell(q, S["s1"], S["t1"], FEE, S["v"]) - (TX_FEE if q > 0 else 0.0)
 
 
 # How a stop loss fills when the price crosses it inside a candle: "close" (default) = min(stop, candle close);
@@ -118,7 +120,7 @@ def exit_bot(S, te, usd_e, s_e, q, rules=None):
             continue
         if c[0] >= S["t_fill"]:
             break
-        if math.sqrt(S["k"] * (c[4] / S["conv"])) > 5 * (s_e + VIRT):
+        if math.sqrt(S["k"] * (c[4] / S["conv"])) > 5 * (s_e + S["v"]):
             break                                          # implausible candle: stop trusting prices
         if c[0] > te + R["max_hold"] * 60:
             if last is not None and c[0] - last[0] <= 180:
@@ -189,7 +191,7 @@ def grid_search(rows, train_frac=0.6, out=print):
             e = entry(S, p["created"], d, guard=True, momentum=False)
             if e:
                 te, usd, s_e, t_e = e
-                entries.setdefault(d, []).append((i < cut, S, te, usd, s_e, buy_at(s_e, t_e)))
+                entries.setdefault(d, []).append((i < cut, S, te, usd, s_e, buy_at(s_e, t_e, S["v"])))
     out(f"pools {len(pools)} (train {cut}, test {len(pools) - cut}); configs {len(delays) * len(rules)}")
     scored = []
     for d, ents in entries.items():
@@ -247,7 +249,7 @@ def run(rows, delays=(5, 15, 30, 60), out=print):
                     if not e:
                         continue
                     te, usd, s_e, t_e = e
-                    q = buy_at(s_e, t_e)
+                    q = buy_at(s_e, t_e, S["v"])
                     val = exit_hold(S, q) if mode == "hold" else exit_bot(S, te, usd, s_e, q)
                     parts["early" if i < half else "late"].append((val - TX_FEE) / STAKE - 1)
                 results[(name, d, mode)] = parts

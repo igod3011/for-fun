@@ -55,13 +55,13 @@ HOLDER_RULES = {
 
 def outcomes(p, S, max_h1=None):
     """(hold return from registration, bot-rule return or None)."""
-    q = et.buy_at(S["s0"], S["t0"])
+    q = et.buy_at(S["s0"], S["t0"], S["v"])
     hold = (et.exit_hold(S, q) - et.TX_FEE) / et.STAKE - 1
     bot = None
     e = et.entry(S, p["created"], BOT_DELAY, guard=True, momentum=False, max_h1=max_h1)
     if e:
         te, usd, s_e, t_e = e
-        q = et.buy_at(s_e, t_e)
+        q = et.buy_at(s_e, t_e, S["v"])
         bot = (et.exit_bot(S, te, usd, s_e, q, BOT_RULES) - et.TX_FEE) / et.STAKE - 1
     return hold, bot
 

@@ -17,7 +17,7 @@ from . import amm
 from .config import BotConfig
 from .data import find_pumpswap_pool, pool_reserves, recent_cohort_rows
 from .paper import Paper
-from .strategy import entry_check, exit_decision
+from .strategy import entry_check, exit_decision, pos_virt
 from .review import load as load_log
 from .review import summary
 from .intel import fetch as fetch_intel
@@ -28,10 +28,11 @@ from .wallets import WalletWatcher, load_watchlist
 
 class Bot:
     def __init__(self, cfg, tg, reserves=pool_reserves, rows=recent_cohort_rows, watcher=None, find_pool=None,
-                 intel=None, holders=None):
+                 intel=None, holders=None, virt=None):
         self.cfg, self.tg, self.reserves, self.rows = cfg, tg, reserves, rows
         self.intel = intel                 # callable(mint, pool) -> (rugcheck_info, dex_info); None = skip
         self.holders = holders             # callable(cohort_row) -> holder snapshot (Helius DAS); None = skip
+        self.virt = virt                   # callable(pool) -> the pool's virtual reserve in SOL (free RPC); None = cfg value
         self.watcher, self.find_pool = watcher, find_pool
         self.follow_hits = {}            # mint -> {wallet: ts}
         self.followed = set()
@@ -83,6 +84,16 @@ class Bot:
                 self.error(f"discover {mint[:8]}", e)
         self.p.save()
 
+    def pool_virt(self, pool, last=None):
+        """The pool's own virtual reserve, read on-chain; on any failure the last known value (None = cfg fallback)."""
+        if not self.virt:
+            return last
+        try:
+            v = self.virt(pool)
+        except Exception:
+            return last
+        return last if v is None else v
+
     def consider(self, r, mint):
         """Risk gate + live reserves + intel for one candidate that is inside its entry window; buys if all pass."""
         with self.lock:
@@ -107,7 +118,8 @@ class Bot:
             ok, info, price, mcap = self.check_intel(mint, r["pool"], r.get("name"), **snap)
             if not ok:
                 return
-            pos = self.p.buy(r, sol, tok, self.cfg.stake_sol, "entry filter passed", price_usd=price, mcap=mcap, **snap)
+            pos = self.p.buy(r, sol, tok, self.cfg.stake_sol, "entry filter passed", price_usd=price, mcap=mcap,
+                             virt=self.pool_virt(r["pool"]), **snap)
         grew = f"Holder {snap['holders_reg']} → {snap['holders_entry']}\n" if snap.get("holders_entry") is not None else ""
         self.say(f"🟢 PAPER BUY\n{token_block(pos.name, mint)}\n{info}{grew}{self.cfg.stake_sol} SOL, pool {sol:.0f} SOL",
                  html=True)
@@ -148,7 +160,7 @@ class Bot:
         """Entry vs current price/market cap, from the pool's real reserves (no extra API call)."""
         if not (pos.entry_price_usd and pos.entry_pool_tok and tok):
             return ""
-        v = self.cfg.virtual_quote_sol
+        v = pos_virt(pos, self.cfg)
         ratio = amm.price(sol, tok, v) / amm.price(pos.entry_pool_sol, pos.entry_pool_tok, v)
         return (f"Giá {fmt_price(pos.entry_price_usd)} → {fmt_price(pos.entry_price_usd * ratio)}"
                 f" | MC {fmt_usd(pos.entry_mcap)} → {fmt_usd(pos.entry_mcap * ratio)}\n")
@@ -164,7 +176,8 @@ class Bot:
             except Exception as e:                         # one unreadable pool must not stop the exits of the others
                 self.error(f"manage {mint[:8]}", e)
                 continue
-            self.record_series(mint, sol, tok, now)
+            pos.virt_sol = self.pool_virt(pos.pool, pos.virt_sol)
+            self.record_series(mint, sol, tok, now, pos.virt_sol)
             with self.lock:
                 frac, reason = exit_decision(pos, sol, tok, now, self.cfg)
                 if frac > 0:
@@ -212,14 +225,15 @@ class Bot:
             if not ok:
                 return
             pos = self.p.buy({"mint": mint, "pool": pool, "name": mint[:6]}, sol, tok, self.cfg.stake_sol,
-                             f"follow {len(wallets)} wallet(s): {who}", price_usd=price, mcap=mcap)
+                             f"follow {len(wallets)} wallet(s): {who}", price_usd=price, mcap=mcap,
+                             virt=self.pool_virt(pool))
         self.say(f"🐋 PAPER FOLLOW BUY\n{token_block(pos.name, mint)}\n{info}{len(wallets)} watched wallet(s) bought: {who}\n"
                  f"{self.cfg.stake_sol} SOL, pool {sol:.0f} SOL", html=True)
 
-    def record_series(self, mint, sol, tok, now):
+    def record_series(self, mint, sol, tok, now, virt=None):
         """Reserve time series of held pools: lets us replay other exit rules on real data later."""
         with open(self.cfg.series_path, "a") as f:
-            f.write(json.dumps({"ts": int(now), "mint": mint, "pool_sol": sol, "pool_tokens": tok}) + "\n")
+            f.write(json.dumps({"ts": int(now), "mint": mint, "pool_sol": sol, "pool_tokens": tok, "virt_sol": virt}) + "\n")
 
     def daily_summary(self):
         today = time.strftime("%Y-%m-%d")
@@ -360,8 +374,9 @@ def main():
             sys.exit(f"follow_enabled but no wallets in {cfg.wallets_path} (run memebot.ml.wallet_scores first)")
         watcher = WalletWatcher(wallets, rpc_call)        # standard RPC: public first, Helius fallback
     from ..helius import holder_snapshot
+    from ..rpc import pool_virtual_sol
     bot = Bot(cfg, tg, watcher=watcher, find_pool=lambda mint: find_pumpswap_pool(mint, cfg.cohort_path),
-              intel=fetch_intel, holders=lambda row: holder_snapshot(row, max_pages=2))
+              intel=fetch_intel, holders=lambda row: holder_snapshot(row, max_pages=2), virt=pool_virtual_sol)
     if a.once:
         bot.loop(once=True)
         print(bot.status())

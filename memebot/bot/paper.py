@@ -5,7 +5,7 @@ import time
 from dataclasses import asdict
 
 from . import amm
-from .strategy import Position
+from .strategy import Position, pos_virt
 
 
 class Seen(dict):
@@ -78,24 +78,26 @@ class Paper:
         return True, ""
 
     # trades --------------------------------------------------------------------------------------
-    def buy(self, row, pool_sol, pool_tok, stake, reason, price_usd=0.0, mcap=0.0, **extra):
-        """extra: fields recorded with the decision (e.g. the holder snapshot taken right before buying)."""
-        tokens = amm.buy(stake, pool_sol, pool_tok, self.cfg.fee, self.cfg.virtual_quote_sol)
+    def buy(self, row, pool_sol, pool_tok, stake, reason, price_usd=0.0, mcap=0.0, virt=None, **extra):
+        """virt: the pool's virtual reserve read on-chain (None = cfg fallback).
+        extra: fields recorded with the decision (e.g. the holder snapshot taken right before buying)."""
+        virt = self.cfg.virtual_quote_sol if virt is None else virt
+        tokens = amm.buy(stake, pool_sol, pool_tok, self.cfg.fee, virt)
         stake_paid = stake + self.cfg.tx_fee_sol          # the fixed transaction fee is part of the cost
         self.balance -= stake_paid
         pos = Position(row["mint"], row["pool"], row.get("name", "?"), tokens, stake_paid, time.time(),
                        pool_sol, peak_pool_sol=pool_sol, entry_pool_tok=pool_tok,
-                       entry_price_usd=price_usd or 0.0, entry_mcap=mcap or 0.0)
+                       entry_price_usd=price_usd or 0.0, entry_mcap=mcap or 0.0, virt_sol=virt)
         self.positions[row["mint"]] = pos
         self.log(action="buy", mint=pos.mint, name=pos.name, sol=stake, tokens=tokens, pool_sol=pool_sol,
-                 pool_tokens=pool_tok, reason=reason, price_usd=price_usd, mcap=mcap, **extra)
+                 pool_tokens=pool_tok, virt_sol=virt, reason=reason, price_usd=price_usd, mcap=mcap, **extra)
         self.save()
         return pos
 
     def sell(self, mint, fraction, pool_sol, pool_tok, reason):
         pos = self.positions[mint]
         q = pos.tokens * min(max(fraction, 0), 1)
-        out = amm.sell(q, pool_sol, pool_tok, self.cfg.fee, self.cfg.virtual_quote_sol) if pool_tok > 0 else 0.0
+        out = amm.sell(q, pool_sol, pool_tok, self.cfg.fee, pos_virt(pos, self.cfg)) if pool_tok > 0 else 0.0
         out = max(out - self.cfg.tx_fee_sol, 0.0)         # fixed fee per sell transaction
         pos.tokens -= q
         pos.realized_sol += out
@@ -108,6 +110,7 @@ class Paper:
             self.total_pnl += pnl
             del self.positions[mint]
         self.log(action="sell", mint=mint, name=pos.name, fraction=fraction, sol_out=out, pool_sol=pool_sol,
+                 pool_tokens=pool_tok, virt_sol=pos.virt_sol,
                  reason=reason, closed=closed, pnl=pnl)
         self.save()
         return out, pnl

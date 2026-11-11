@@ -20,6 +20,7 @@ class Position:
     entry_pool_tok: float = 0.0
     entry_price_usd: float = 0.0
     entry_mcap: float = 0.0
+    virt_sol: float = None             # the pool's virtual reserve (read on-chain); None = cfg.virtual_quote_sol
 
     @classmethod
     def from_state(cls, d):
@@ -68,11 +69,15 @@ def entry_check(c, cfg):
     return (not bad), bad
 
 
+def pos_virt(pos, cfg):
+    return cfg.virtual_quote_sol if pos.virt_sol is None else pos.virt_sol
+
+
 def exit_decision(pos, pool_sol, pool_tok, now, cfg):
     """Returns (fraction_to_sell, reason) or (0, None). Value = SOL the pool would REALLY pay now."""
     if pool_tok <= 0 or pos.tokens <= 0:
         return 1.0, "pool empty"
-    value = amm.sell(pos.tokens, pool_sol, pool_tok, cfg.fee, cfg.virtual_quote_sol)
+    value = amm.sell(pos.tokens, pool_sol, pool_tok, cfg.fee, pos_virt(pos, cfg))
     mult = (value + pos.realized_sol) / pos.cost_sol
     pos.peak_mult = max(pos.peak_mult, mult)
     pos.peak_pool_sol = max(pos.peak_pool_sol, pool_sol)

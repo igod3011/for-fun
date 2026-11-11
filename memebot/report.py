@@ -3,7 +3,7 @@ import sys
 import time
 
 from . import store
-from .bot.amm import PUMP_VIRTUAL_SOL
+from .bot.amm import PUMP_FEE, PUMP_VIRTUAL_SOL, row_virt
 
 
 def main(path):
@@ -66,7 +66,7 @@ def cohort_baseline(filled, cost=0.02):
           f"  -> {'NEGATIVE: no edge' if eq < 1 else 'positive: check robustness before believing it'}")
 
 
-def realizable_return(p, stake_sol=0.1, fee=0.01, virt=0.0):
+def realizable_return(p, stake_sol=0.1, fee=2 * PUMP_FEE, virt=0.0):
     """SOL you could actually get back. Buy `stake_sol` at the pool's spot price at registration
     (Helius reserves, minutes after migration), sell everything into the pool's REAL reserves at fill
     time (out = (sol + virt) * q / (tokens + q), capped by the real SOL). A drained pool returns ~0 whatever its
@@ -93,7 +93,7 @@ def realizable_baseline(rows, min_entry_sol=20.0):
         return
     empty = [p for p in snap if (p["helius_reg"]["pool_sol"] or 0) < 1]
     thin = [p for p in snap if 1 <= (p["helius_reg"]["pool_sol"] or 0) < min_entry_sol]
-    print(f"REALIZABLE (Helius reserves; buy 0.1 SOL at registration, sell into the REAL pool at fill, ~1% fees)")
+    print(f"REALIZABLE (Helius reserves; buy 0.1 SOL at registration, sell into the REAL pool at fill, 1.2% fee per swap)")
     print(f"   {len(snap)} pools with both snapshots: {len(empty)} ({len(empty)/len(snap):.0%}) were ALREADY EMPTY (<1 SOL) "
           f"minutes after creation (untradable), {len(thin)} thin (<{min_entry_sol:.0f} SOL) excluded")
     tradable = [p for p in snap if (p["helius_reg"]["pool_sol"] or 0) >= min_entry_sol]
@@ -111,7 +111,7 @@ def realizable_baseline(rows, min_entry_sol=20.0):
             ("CANONICAL pump.fun graduation pools (mint ...pump, k~1.7e10)", [p for p in pumpm if canon(p)], PUMP_VIRTUAL_SOL),
             ("...pump mints in NON-canonical pools", [p for p in pumpm if not canon(p)], 0.0),
             ("other PumpSwap pools", [p for p in tradable if not p["mint"].endswith("pump")], 0.0)):
-        r = [x for x in (realizable_return(p, virt=virt) for p in grp) if x is not None]
+        r = [x for x in (realizable_return(p, virt=row_virt(p, virt)) for p in grp) if x is not None]
         if len(r) < 4:
             print(f"   {label}: n={len(r)} (too few)")
             continue

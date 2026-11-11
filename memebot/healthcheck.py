@@ -94,12 +94,13 @@ def main():
             holders = [r for r in canon if r["helius_reg"].get("top_holders") is not None]
             errs = [r["helius_reg"]["holders_error"] for r in canon if r["helius_reg"].get("holders_error")]
             virt = [r["helius_reg"]["virt_sol"] for r in canon if r["helius_reg"].get("virt_sol") is not None]
-            off = [v for v in virt if abs(v - PUMP_VIRTUAL_SOL) > 0.01 * PUMP_VIRTUAL_SOL]
-            if off:
-                out("WARN", f"virtual reserve read on-chain differs from the {PUMP_VIRTUAL_SOL} SOL used in bot/amm.py "
-                            f"in {len(off)}/{len(virt)} recent canonical pools (e.g. {off[-1]:.3f}): every valuation is off")
-            elif virt:
-                out("PASS", f"virtual reserve on-chain = {virt[-1]:.3f} SOL in {len(virt)}/{len(canon)} recent canonical pools")
+            if virt:
+                med = sorted(virt)[len(virt) // 2]
+                ok = abs(med - PUMP_VIRTUAL_SOL) <= 0.02 * PUMP_VIRTUAL_SOL
+                out("PASS" if ok else "WARN", f"virtual reserve read on-chain for {len(virt)}/{len(canon)} recent canonical pools, "
+                    f"median {med:.3f} SOL" + ("" if ok else f"  -> the fallback {PUMP_VIRTUAL_SOL} in bot/amm.py is out of date"))
+            elif canon:
+                out("WARN", "no virtual reserve recorded for recent canonical pools (public RPC failing, or layout changed)")
             if canon and holders:
                 out("PASS", f"Helius holder data on canonical pools: {len(holders)}/{len(canon)}")
             elif errs:

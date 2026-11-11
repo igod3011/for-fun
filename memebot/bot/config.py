@@ -2,7 +2,7 @@ import json
 import os
 from dataclasses import asdict, dataclass, field
 
-from .amm import PUMP_VIRTUAL_SOL
+from .amm import PUMP_FEE, PUMP_VIRTUAL_SOL
 
 
 @dataclass
@@ -12,9 +12,9 @@ class BotConfig:
     stake_sol: float = 0.2              # SOL per entry; grid: 0.2 beat 0.05 (fixed tx fee 0.3% vs 1.2% per round trip)
     max_positions: int = 3
     max_daily_loss_sol: float = 0.6     # PAPER: loose so measurement is not cut short; set tight before real money
-    fee: float = 0.005                  # per swap, proportional (pool fee)
+    fee: float = PUMP_FEE               # per swap: 1.2% measured from real quotes 11/2026 (was assumed 0.5%)
     tx_fee_sol: float = 0.0003          # per transaction, fixed (priority + base fee)
-    virtual_quote_sol: float = PUMP_VIRTUAL_SOL   # pump.fun-migrated pools price on real SOL + this (see amm.py)
+    virtual_quote_sol: float = PUMP_VIRTUAL_SOL   # FALLBACK virtual reserve; the bot reads each pool's own value on-chain
 
     # entry filter (placeholder until the 2-week analysis decides better rules)
     min_pool_sol: float = 40.0          # graduation pools start ~60-85 SOL; half the SOL = price down ~75%

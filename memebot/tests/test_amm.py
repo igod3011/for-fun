@@ -63,8 +63,51 @@ class VirtualReserveTest(unittest.TestCase):
         p = {"helius_reg": {"pool_sol": 85.0, "pool_tokens": k / (85 + V)},
              "helius_fill": {"pool_sol": 170.0, "pool_tokens": k / (170 + V)}}
         true = ((170 + V) / (85 + V)) ** 2 - 1                                   # price x3.34
-        self.assertAlmostEqual(realizable_return(p, virt=V), true, delta=0.06)   # minus ~1% fees and impact
+        self.assertAlmostEqual(realizable_return(p, virt=V), true, delta=0.10)   # minus 2.4% fees and impact
         self.assertGreater(realizable_return(p), true + 0.2)                     # the old formula overstated winners
+
+
+class PerPoolVirtualReserveTest(unittest.TestCase):
+    """The virtual reserve differs between pools (seen on-chain: 17.58, 15.3, 11.2, 2.9, 0): use the pool's own."""
+
+    def bot(self, virt):
+        self.tg = FakeTG()
+        return Bot(cfg_in(tempfile.mkdtemp(), virtual_quote_sol=V), self.tg, reserves=lambda pool, mint: (85.0, 2.07e8),
+                   rows=lambda path, **kw: [row("Aaapump")], virt=virt)
+
+    def test_bot_buys_and_values_with_the_pools_own_value(self):
+        bot = self.bot(lambda pool: 11.158)
+        bot.discover()
+        pos = bot.p.positions["Aaapump"]
+        self.assertEqual(pos.virt_sol, 11.158)
+        self.assertAlmostEqual(pos.tokens, amm.buy(0.2, 85.0, 2.07e8, bot.cfg.fee, 11.158))
+        buy = json.loads(open(bot.cfg.log_path).read().splitlines()[-1])
+        self.assertEqual((buy["action"], buy["virt_sol"]), ("buy", 11.158))
+        bot.manage()
+        self.assertEqual(json.loads(open(bot.cfg.series_path).read().splitlines()[-1])["virt_sol"], 11.158)
+
+    def test_rpc_failure_falls_back_to_the_last_known_then_the_default(self):
+        def broken(pool):
+            raise RuntimeError("429")
+        bot = self.bot(broken)
+        bot.discover()
+        pos = bot.p.positions["Aaapump"]
+        self.assertEqual(pos.virt_sol, V)                                         # nothing read: cfg fallback is used
+        self.assertAlmostEqual(pos.tokens, amm.buy(0.2, 85.0, 2.07e8, bot.cfg.fee, V))
+        pos.virt_sol = 16.9
+        bot.manage()
+        self.assertEqual(bot.p.positions["Aaapump"].virt_sol, 16.9)                # kept when the read fails
+
+    def test_backtest_uses_the_value_recorded_at_registration(self):
+        p = pool(lambda m: 85.0)
+        self.assertEqual(et.setup(p)["v"], V)                                     # old rows: fallback
+        p["helius_reg"]["virt_sol"] = 11.158
+        S = et.setup(p)
+        self.assertEqual(S["v"], 11.158)
+        self.assertAlmostEqual(S["k"], (85.0 + 11.158) * p["helius_reg"]["pool_tokens"])
+
+    def test_fee_default_is_the_measured_one(self):
+        self.assertEqual((BotConfig().fee, et.FEE, amm.PUMP_FEE), (0.012, 0.012, 0.012))
 
 
 class RobustnessTest(unittest.TestCase):

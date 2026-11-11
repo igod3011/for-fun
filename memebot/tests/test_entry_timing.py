@@ -37,7 +37,7 @@ class EntryTimingTest(unittest.TestCase):
         te, usd, s_e, t_e = et.entry(S, T0, 15, guard=False, momentum=False)
         self.assertAlmostEqual(s_e, 85.0, places=3)
         q = et.buy_at(s_e, t_e)
-        self.assertAlmostEqual(et.exit_hold(S, q) / et.STAKE - 1, -0.0111, places=3)   # 2x0.5% fee + ~0.12% impact
+        self.assertAlmostEqual(et.exit_hold(S, q) / et.STAKE - 1, -0.0248, places=3)   # 2x1.2% fee + ~0.1% impact
 
     def test_guard_blocks_the_knife(self):
         S = et.setup(pool(knife))

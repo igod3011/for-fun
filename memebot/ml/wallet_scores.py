@@ -5,8 +5,14 @@ outcome of each pool (what the pool would really pay at fill, see report.realiza
   1. Sort tradable canonical pump.fun pools by creation time; first --train-frac = discovery, rest = test.
   2. Discovery: score every wallet that was an early top-10 holder: smoothed win rate over the pools it was in.
   3. Test (out of sample, later in time): do pools where a selected wallet was an early holder do better
-     than pools without one? If not, following those wallets has no edge.
-  4. Writes smart_wallets.json (selected on ALL data) for the bot's follow mode, with the test verdict inside.
+     than pools without one? PASS needs >= 20 such pools, a higher MEAN return AND a higher win rate, and the
+     90% bootstrap CI of the mean difference above 0 (until 11/2026 a +5-point win rate on 20 pools was enough).
+  4. Writes smart_wallets.json (selected on ALL data) for the bot's follow mode, with the test verdict inside;
+     the bot refuses a FAIL list.
+Wallet-farm pools (the bot's own filter, strategy.farm_reasons) are left out: they lose anyway, so any wallet seen
+only in normal pools would look "smart" for that reason alone. Pass --with-farms to see the difference.
+Limit: "was a top-10 holder ~5 min after creation" is not "bought early and sold well". A PASS here is a reason
+to paper-trade follow mode, not proof that copying those wallets pays.
 
   python -m memebot.ml.wallet_scores --data cohort.jsonl
 """
@@ -17,8 +23,11 @@ import sys
 from collections import defaultdict
 
 from .. import store
-from ..bot.amm import PUMP_VIRTUAL_SOL
+from ..bot.amm import row_virt
+from ..bot.config import BotConfig
+from ..bot.strategy import farm_reasons
 from ..report import realizable_return
+from .rc_rules import diff_ci, mean
 
 
 def tradable(p, min_sol=20.0, k_min=1.0e10, k_max=2.6e10):
@@ -26,6 +35,17 @@ def tradable(p, min_sol=20.0, k_min=1.0e10, k_max=2.6e10):
     sol, tok = h.get("pool_sol"), h.get("pool_tokens")
     return (p.get("mint", "").endswith("pump") and sol and tok and sol >= min_sol
             and k_min <= sol * tok <= k_max and h.get("top_holders") and p.get("helius_fill"))
+
+
+def verdict(hit, miss, min_hit=20):
+    """(passed, text). hit/miss: test-pool returns with / without a selected wallet among the early holders."""
+    if len(hit) < min_hit or len(miss) < min_hit:
+        return False, f"FAIL: too few test pools with a selected wallet ({len(hit)}; need {min_hit})"
+    win = lambda x: sum(v > 0 for v in x) / len(x)
+    lo, hi = diff_ci(hit, miss)
+    if mean(hit) > mean(miss) and win(hit) > win(miss) and lo > 0:
+        return True, f"PASS: selected wallets kept an edge out of sample (mean diff 90% CI {lo:+.0%}..{hi:+.0%})"
+    return False, f"FAIL: no reliable out-of-sample edge (mean diff 90% CI {lo:+.0%}..{hi:+.0%})"
 
 
 def score_wallets(pools, min_pools=3, prior=5, max_share=0.10):
@@ -72,11 +92,16 @@ def main():
     ap.add_argument("--train-frac", type=float, default=0.6)
     ap.add_argument("--top", type=int, default=30)
     ap.add_argument("--out", default="smart_wallets.json")
+    ap.add_argument("--with-farms", action="store_true", help="keep wallet-farm pools (not what the bot trades)")
     a = ap.parse_args()
     rows = store.load(a.data, candles=False, filled_only=True)
     pools = sorted((p for p in rows if tradable(p)), key=lambda p: p["created"])
+    if not a.with_farms:
+        cfg, n = BotConfig(), len(pools)
+        pools = [p for p in pools if not farm_reasons(p["helius_reg"], cfg)]
+        print(f"wallet-farm pools left out: {n - len(pools)} of {n}")
     data = [(p["helius_reg"]["top_holders"], r) for p in pools
-            for r in [realizable_return(p, virt=PUMP_VIRTUAL_SOL)] if r is not None]
+            for r in [realizable_return(p, virt=row_virt(p))] if r is not None]
     print(f"tradable canonical pools with holder addresses + outcome: {len(data)}")
     if len(data) < 100:
         print("too few pools yet (need a few days of data collected AFTER the address update)")
@@ -90,11 +115,10 @@ def main():
         print(f"   {w[:8]}..  pools {n:3}  wins {wins:3}  smoothed {sm:.0%}  median {med:+.0%}")
     hit, miss, dh, dm = evaluate(test, sel)
     print(f"TEST (later pools): with a selected wallet early: {dh} | without: {dm}")
-    ok = bool(hit) and len(hit) >= 20 and (sum(v > 0 for v in hit) / len(hit)) > (sum(v > 0 for v in miss) / max(len(miss), 1)) + 0.05
-    verdict = "PASS: selected wallets kept an edge out of sample" if ok else "FAIL: no reliable out-of-sample edge"
-    print(verdict)
+    _, text = verdict(hit, miss)
+    print(text)
     _, scored_all = score_wallets(data)
-    json.dump({"verdict": verdict, "test_with": dh, "test_without": dm,
+    json.dump({"verdict": text, "test_with": dh, "test_without": dm,
                "wallets": [w for *_, w in scored_all[:a.top]]}, open(a.out, "w"), indent=1)
     print(f"wrote {a.out} ({min(a.top, len(scored_all))} wallets, selected on all data)")
 
