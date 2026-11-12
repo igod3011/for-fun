@@ -59,6 +59,7 @@ class BotConfig:
     # loop timing / files
     poll_positions_s: float = 15.0
     discover_every_s: float = 60.0
+    collector_stale_min: float = 15.0   # no new pool registered for this long -> the collector is down: say so on Telegram
     cohort_path: str = "cohort.jsonl"
     log_path: str = "bot_trades.jsonl"
     state_path: str = "bot_state.json"

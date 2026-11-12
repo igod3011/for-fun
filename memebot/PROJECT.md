@@ -81,10 +81,11 @@ cd C:\Users\PC1433\memebot\for-fun-claude-mql5-market-product-5p7wht
 set HELIUS_API_KEY=...
 set TELEGRAM_BOT_TOKEN=...
 set TELEGRAM_CHAT_ID=...
-memebot\restart_collector.bat
-memebot\start_bot.bat
+memebot\start_all.bat
 python -m memebot.healthcheck
 ```
+- `start_all.bat` chạy cả bộ thu thập lẫn bot. **Sau mỗi lần máy khởi động lại phải chạy lại lệnh này**: bot chỉ mua
+  được pool do bộ thu thập ghi nhận, nên chạy riêng `start_bot.bat` thì bot đứng yên (bot sẽ báo Telegram nếu vậy).
 - Biến môi trường chỉ sống trong cửa sổ đó; máy khởi động lại thì đặt lại và chạy lại hai file `.bat`.
 - Lấy chat id: gửi `hi` cho bot, rồi `python -m memebot.bot.telegram --whoami` (khi bot đang dừng).
 - Mở sổ paper mới: `memebot\reset_paper.bat`, rồi `memebot\start_bot.bat`.

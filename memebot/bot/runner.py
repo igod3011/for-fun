@@ -42,6 +42,7 @@ class Bot:
         self.last_err = 0.0
         self.summary_day = None
         self.warned_balance = False
+        self.collector_down = False
 
     def say(self, text, html=False):
         try:
@@ -58,7 +59,9 @@ class Bot:
         entry_delay_min old (then the falling-knife guard is applied to the reserves at that moment)."""
         horizon = (self.cfg.entry_delay_min + self.cfg.entry_window_min + 20) * 60
         now = time.time()
-        for r in self.rows(self.cfg.cohort_path, max_age_s=max(horizon, 1800)):
+        rows = self.rows(self.cfg.cohort_path, max_age_s=max(horizon, 1800))
+        self.check_collector(rows, now)
+        for r in rows:
             mint = r.get("mint")
             if not mint or mint in self.p.seen:
                 continue
@@ -93,6 +96,19 @@ class Bot:
         except Exception:
             return last
         return last if v is None else v
+
+    def check_collector(self, rows, now):
+        """The bot only sees pools the collector registers. If nothing new arrives, it silently does nothing (this
+        happened after a reboot: only the bot was started again). Say so once, and once more when it is back."""
+        newest = max((r.get("registered_at", 0) for r in rows), default=0)
+        stale = (now - newest) / 60 > self.cfg.collector_stale_min
+        if stale and not self.collector_down:
+            age = f"{(now - newest) / 60:.0f} phút" if newest else "hơn 2 giờ"
+            self.say(f"⚠️ Bộ thu thập không ghi pool mới nào trong {age}: bot KHÔNG có gì để mua. "
+                     "Chạy memebot\\start_all.bat (hoặc restart_collector.bat) trong cửa sổ đã đặt 3 biến môi trường.")
+        elif not stale and self.collector_down:
+            self.say("✅ Bộ thu thập đã chạy lại: bot tiếp tục xét pool mới.")
+        self.collector_down = stale
 
     def consider(self, r, mint):
         """Risk gate + live reserves + intel for one candidate that is inside its entry window; buys if all pass."""

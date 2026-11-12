@@ -165,6 +165,20 @@ class RobustnessTest(unittest.TestCase):
         self.assertEqual(self.bot.p.positions, {})
         self.assertEqual(sum("Hết vốn paper" in m for m in self.tg.sent), 1)
 
+    def test_a_silent_collector_is_announced_once_and_its_return_too(self):
+        old = row("Oldpump")
+        old["registered_at"] = NOW - 40 * 60                         # nothing registered for 40 minutes
+        self.rows[:] = [old]
+        self.bot.discover()
+        self.bot.discover()
+        self.assertEqual(sum("Bộ thu thập không ghi pool mới" in m for m in self.tg.sent), 1)
+        self.rows.append(row("Newpump"))
+        self.bot.discover()
+        self.assertEqual(sum("đã chạy lại" in m for m in self.tg.sent), 1)
+        self.rows[:] = []                                            # an empty cohort tail is also "down"
+        self.bot.discover()
+        self.assertEqual(sum("Bộ thu thập không ghi pool mới" in m for m in self.tg.sent), 2)
+
     def test_watchlist_with_a_fail_verdict_is_empty(self):
         path = os.path.join(self.tmp, "w.json")
         for verdict, want in (("FAIL: no reliable out-of-sample edge", []), ("PASS: kept an edge", ["W1", "W2"])):
