@@ -109,6 +109,7 @@ mint, GeckoTerminal, RugCheck, DexScreener, báo giá Jupiter) miễn phí và c
 |---|---|
 | `cohort.jsonl` | Một dòng ghi nhận mỗi pool PumpSwap mới; chỉ ghi nối |
 | `cohort.fills.jsonl`, `cohort.filled.txt` | Kết quả sau ≥3 giờ (nến, RugCheck, dự trữ) và chỉ mục pool đã điền |
+| (thứ tự điền nến) | GeckoTerminal giới hạn tốc độ nên chỉ điền được ~2.500 pool/ngày trên ~3.000 pool mới. Từ 13/11/2026: pool chuẩn pump.fun điền trước; pool không chuẩn còn chờ ở 15 giờ tuổi chỉ lưu dự trữ (`candles_skipped`), vì nến đầu của nó đằng nào cũng sắp hết hạn |
 | `cohort.snaps.jsonl` | Ảnh chụp holder lần hai lúc pool ~90 phút tuổi (lúc bot quyết định), chỉ với pool qua bộ lọc tĩnh của bot; `store.load` gộp thành `helius_90`. Từ 13/11/2026, ~20 credit Helius mỗi pool (~110 pool/ngày) |
 | `bot_trades.jsonl`, `bot_series.jsonl`, `bot_state.json` | Nhật ký quyết định, dự trữ mỗi 15 giây của vị thế, trạng thái |
 | `archive/<ngày>/` | Các sổ paper cũ |

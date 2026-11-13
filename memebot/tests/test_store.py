@@ -184,6 +184,27 @@ class CollectTest(unittest.TestCase):
         self.assertEqual(rows["OLD2"]["helius_fill"], {"pool_sol": 1.5, "pool_tokens": 9e8, "holders_asked": False})
         self.assertFalse(rows["YOUNG"].get("filled"))
 
+    def test_fill_takes_canonical_pools_first_and_old_junk_gets_reserves_only(self):
+        junk = lambda name, age_h: reg(name, age_h=age_h, mint="Xnotpmp", helius_reg={"pool_sol": 0.1, "pool_tokens": 5.0})
+        write(self.path, [junk("J16", 16), junk("J15", 15.5), junk("J9", 9), junk("J5", 5), reg("C4", age_h=4),
+                          reg("C6", age_h=6), reg("C7", age_h=7)])
+        asked = []
+        collect.get = lambda url, **kw: asked.append(url.split("/pools/")[1].split("/")[0]) or {
+            "data": {"attributes": {"ohlcv_list": [[2, 1, 1, 1, 1, 5]]}}}
+        collect.rugcheck = lambda mint: None
+        collect.helius_snapshot = lambda p, with_holders=True: {"pool_sol": 0.0, "pool_tokens": 0.0}
+        self.assertEqual(collect.fill(self.path, 3, max_fill=3), 3)
+        self.assertEqual(asked, ["C7", "C6", "C4"])          # canonical first (oldest first), whatever the junk's age
+        rows = {r["pool"]: r for r in store.load(self.path)}
+        for name in ("J16", "J15"):                          # about to lose their candles anyway: closed cheaply
+            self.assertTrue(rows[name]["candles_skipped"])
+            self.assertEqual(rows[name]["candles"], [])
+            self.assertIn("helius_fill", rows[name])
+        self.assertFalse(rows["J9"].get("filled"))           # younger junk waits for a free slot
+        self.assertEqual(collect.fill(self.path, 3, max_fill=3), 2)
+        self.assertEqual(asked[3:], ["J9", "J5"])
+        self.assertNotIn("candles_skipped", {r["pool"]: r for r in store.load(self.path)}["J9"])
+
     def test_fill_survives_a_bad_pool_and_keeps_dead_pools(self):
         write(self.path, [reg("BAD"), reg("DEAD")])
         collect.rugcheck = lambda mint: None

@@ -195,29 +195,53 @@ def snap90(path, max_snaps=5, now=None):
     return n
 
 
+def row_canonical(p):
+    h = p.get("helius_reg") or {}
+    return bool(h.get("pool_tokens")) and is_canonical(p.get("mint", ""), h.get("pool_sol") or 0, h["pool_tokens"])
+
+
+CHEAP_AGE_H, MAX_CHEAP = 15.0, 15
+
+
 def fill(path, min_age_h, max_fill=8):
-    """Fetch the outcome of registered pools older than min_age_h and APPEND it to the fills file."""
+    """Fetch the outcome of registered pools older than min_age_h and APPEND it to the fills file.
+    GeckoTerminal rate-limits the candle call (measured 11/2026: 3-46 s per pool), so there is room for ~2,500
+    full fills a day against ~3,000 new pools. Order: canonical pump.fun pools first (the only ones every analysis
+    and the bot use, ~380 a day), then the rest oldest first. A non-canonical pool that is still waiting at
+    CHEAP_AGE_H would lose its early candles anyway (only ~16.6 h are kept): it gets its reserve snapshot only
+    (free RPC, ~1 s), marked candles_skipped, so the backlog cannot grow without bound."""
     done = store.filled_pools(path)
+    now = time.time()
     waiting = [p for p in store.tail_rows(path) if "candles" not in p and p.get("pool") not in done]
-    now, n = time.time(), 0
-    for p in waiting:
-        if (now - p["created"]) / 3600 < min_age_h:
+    due = sorted((p for p in waiting if (now - p["created"]) / 3600 >= min_age_h),
+                 key=lambda p: (not row_canonical(p), p["created"]))
+    n = cheap = canon_left = 0
+    for p in due:
+        full = n < max_fill        # bounded pass: fill must not delay registration (they run one after the other)
+        canon_left += not full and row_canonical(p)
+        if not full and (cheap >= MAX_CHEAP or row_canonical(p) or (now - p["created"]) / 3600 < CHEAP_AGE_H):
             continue
-        if n >= max_fill:      # bounded pass: fill must not delay registration (they run one after the other)
-            break
         try:
-            o = get(f"{GT}/pools/{p['pool']}/ohlcv/minute?aggregate=1&limit=1000&currency=usd")
-            rec = {"candles": sorted(o["data"]["attributes"]["ohlcv_list"]) if o else [],   # keep empty: dead pools count!
-                   "rugcheck": rugcheck(p["mint"]),
-                   "helius_fill": helius_snapshot(p, with_holders=False),      # outcome only needs reserves (free)
-                   "fetched_at": int(time.time())}
+            if full:
+                o = get(f"{GT}/pools/{p['pool']}/ohlcv/minute?aggregate=1&limit=1000&currency=usd")
+                rec = {"candles": sorted(o["data"]["attributes"]["ohlcv_list"]) if o else [],   # keep empty: dead pools count!
+                       "rugcheck": rugcheck(p["mint"])}
+            else:
+                rec = {"candles": [], "candles_skipped": True}
+            rec["helius_fill"] = helius_snapshot(p, with_holders=False)      # outcome only needs reserves (free)
+            rec["fetched_at"] = int(time.time())
             store.append_fill(path, p["pool"], rec)
         except Exception as e:                      # one bad pool must not kill the pass
             print(f"skip pool {p.get('mint', '?')[:8]}: {type(e).__name__}", flush=True)
             continue
-        n += 1
-        print(f"filled {p['name'].encode('ascii', 'replace').decode()} candles={len(rec['candles'])}", flush=True)
-    print(f"filled {n} pools; {len(waiting) - n} still waiting", flush=True)
+        if full:
+            n += 1
+            print(f"filled {p['name'].encode('ascii', 'replace').decode()} candles={len(rec['candles'])}", flush=True)
+        else:
+            cheap += 1
+    left = len(waiting) - n - cheap
+    print(f"filled {n} pools" + (f" (+{cheap} old non-canonical: reserves only)" if cheap else "")
+          + f"; {left} still waiting, {canon_left} of them canonical and due", flush=True)
     return n
 
 

@@ -18,7 +18,7 @@ import os
 import sys
 import time
 
-FILL_KEYS = ("candles", "rugcheck", "helius_fill", "fetched_at")
+FILL_KEYS = ("candles", "rugcheck", "helius_fill", "fetched_at", "candles_skipped")
 
 
 def _base(path):
