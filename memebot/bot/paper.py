@@ -30,6 +30,7 @@ class Paper:
         self.day = time.strftime("%Y-%m-%d")
         self.day_pnl = 0.0
         self.total_pnl = 0.0
+        self.deposited = 0.0             # paper SOL added later (/topup): never part of the P&L
         self.paused = False
         self.seen = Seen()
         self._load()
@@ -42,6 +43,7 @@ class Paper:
             s = json.load(f)
         self.balance, self.day, self.day_pnl = s["balance"], s["day"], s["day_pnl"]
         self.total_pnl, self.paused = s.get("total_pnl", 0.0), s.get("paused", False)
+        self.deposited = s.get("deposited", 0.0)
         self.seen = Seen.fromkeys(s.get("seen", []))
         self.positions = {m: Position.from_state(p) for m, p in s["positions"].items()}
 
@@ -49,9 +51,19 @@ class Paper:
         tmp = self.cfg.state_path + ".tmp"
         with open(tmp, "w") as f:
             json.dump({"balance": self.balance, "day": self.day, "day_pnl": self.day_pnl, "total_pnl": self.total_pnl,
-                       "paused": self.paused, "seen": list(self.seen)[-SEEN_KEEP:],
+                       "deposited": self.deposited, "paused": self.paused, "seen": list(self.seen)[-SEEN_KEEP:],
                        "positions": {m: asdict(p) for m, p in self.positions.items()}}, f)
         os.replace(tmp, self.cfg.state_path)
+
+    def deposit(self, amount):
+        """Add paper SOL so the measurement is not cut short by an empty balance. P&L figures do not change."""
+        if not 0 < amount <= 100:
+            raise ValueError("amount must be between 0 and 100 SOL")
+        self.balance += amount
+        self.deposited += amount
+        self.log(action="deposit", sol=amount, balance=self.balance)
+        self.save()
+        return self.balance
 
     def log(self, **event):
         event["ts"] = int(time.time())

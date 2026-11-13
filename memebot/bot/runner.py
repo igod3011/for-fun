@@ -302,6 +302,13 @@ class Bot:
             if len(parts) > 1 and parts[1].replace(".", "", 1).isdigit():
                 hours = float(parts[1])
             return summary(load_log(self.cfg.log_path, time.time() - hours * 3600), f"last {hours:g}h")
+        if cmd == "/topup":
+            parts = text.split()
+            try:
+                bal = self.p.deposit(float(parts[1]))
+            except (IndexError, ValueError):
+                return "usage: /topup 5   (adds 5 paper SOL; between 0 and 100)"
+            return f"💰 +{float(parts[1]):g} paper SOL. Balance {bal:.4f} SOL (P&L unchanged: {self.p.total_pnl:+.4f} SOL)"
         if cmd == "/pause":
             self.p.paused = True
             self.p.save()

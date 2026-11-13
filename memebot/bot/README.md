@@ -50,7 +50,7 @@ Muốn đổi thông số: tạo file `bot_config.json` cùng thư mục, ví d�
    `--once` chạy thử một vòng rồi thoát. Sau `start_bot.bat` bạn sẽ nhận tin "bot started" trong Telegram.
 
 ## Lệnh Telegram
-`/status`, `/positions`, `/review [giờ]`, `/pause`, `/resume`, `/sellall`, `/stop`, `/help`.
+`/status`, `/positions`, `/review [giờ]`, `/pause`, `/resume`, `/sellall`, `/topup 5` (nạp thêm SOL paper, không tính vào lãi lỗ), `/stop`, `/help`.
 Bot chỉ nghe lệnh từ đúng `TELEGRAM_CHAT_ID`; tin nhắn từ người khác bị bỏ qua.
 
 ## Chuyển lên VPS sau này

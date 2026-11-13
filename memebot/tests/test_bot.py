@@ -138,6 +138,15 @@ class BotTests(unittest.TestCase):
 
     def test_pause_blocks_new_entries_and_resume(self):
         self.assertIn("paused", self.bot.command("/pause"))
+        before, pnl = self.bot.p.balance, self.bot.p.total_pnl
+        self.assertIn("+5 paper SOL", self.bot.command("/topup 5"))
+        self.assertAlmostEqual(self.bot.p.balance, before + 5)
+        self.assertEqual(self.bot.p.total_pnl, pnl)                 # a deposit is not profit
+        self.assertEqual(Paper(self.bot.cfg).deposited, 5)          # survives a restart
+        for bad in ("/topup", "/topup abc", "/topup -3", "/topup 1000"):
+            self.assertIn("usage", self.bot.command(bad))
+        self.assertAlmostEqual(self.bot.p.balance, before + 5)
+        self.assertIn('"deposit"', open(self.bot.cfg.log_path).read())
         self.bot.discover()
         self.assertEqual(self.bot.p.positions, {})
         self.bot.command("/resume")
