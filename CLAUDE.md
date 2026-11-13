@@ -3,7 +3,10 @@
 This repo's active project is `memebot/`: a Solana memecoin research pipeline and a 24/7 PAPER-trading bot
 controlled over Telegram. Read `memebot/PROJECT.md` first (architecture, data schema, how to evaluate, go/no-go
 gates for real money); numbers and history are in `memebot/RESULTS.md`. The strategy research track (Research
-Engine: every hypothesis tried and its verdict) is in `memebot/research/SCOREBOARD.md` and `PHASE1_AUDIT.md`.
+Engine: every hypothesis tried and its verdict) is in `memebot/research/SCOREBOARD.md` and `PHASE1_AUDIT.md`;
+`python -m memebot.research.run` re-scores every registered hypothesis (`research/hypotheses.py`) against one set of
+gates (`research/score.py`) and rewrites `research/RANKING.md`. New ideas go in as a registered hypothesis with its
+kill criterion and the number of variants tried, never as an ad-hoc script. The engine never trades.
 
 ## Hard rules
 - **Paper only.** Do not add real order execution, wallet handling or private-key code unless the user explicitly asks

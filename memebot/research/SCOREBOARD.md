@@ -1,5 +1,10 @@
 # Bảng giả thuyết đã thử (cập nhật 13/11/2026)
 
+> Từ 13/11/2026 bảng xếp hạng chính thức do Research Engine tự sinh: `python -m memebot.research.run`, kết quả ở
+> `RANKING.md` cùng thư mục. File này giữ lịch sử mọi giả thuyết, kể cả những cái chưa đưa vào engine.
+> Hai giả thuyết đầu tiên qua ngưỡng "backtest → paper" trong engine: **F5** (bán khống coin mới niêm yết) và
+> **C1** (ăn funding trung lập giá). Xem `RANKING.md` để biết con số và giới hạn.
+
 Mọi con số là sau phí, trên dữ liệu thật. "Hai nửa" là nửa đầu và nửa sau của dữ liệu theo thời gian. Chi tiết và
 cách đo: `memebot/RESULTS.md`. Chưa có giả thuyết nào qua ngưỡng "backtest → paper" ở `PHASE1_AUDIT.md` mục 4.
 

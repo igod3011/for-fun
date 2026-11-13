@@ -94,7 +94,12 @@ Ngưỡng đề xuất để một giả thuyết được chuyển sang paper, 
 | Paper → tiền thật | Ít nhất 100 lệnh paper trong ít nhất 4 tuần; kết quả paper nằm trong CI của backtest; sụt giảm lớn nhất dưới mức bạn đặt; bạn yêu cầu bằng lời |
 | Loại bỏ | Vi phạm điều kiện loại bỏ viết trước, hoặc cận trên CI dưới 0 |
 
-## 5. Cần bạn xác nhận trước Phase 2
+## 5. Xác nhận của bạn (13/11/2026)
+
+Vốn 100 USD, chấp nhận mất tối đa 50 USD; duyệt bộ ngưỡng ở mục 4 (mục tiêu: nhiều phương án để chọn cái tốt nhất);
+duyệt viết Research Engine. Engine nằm ở `memebot/research/` (score.py, data.py, hypotheses.py, run.py).
+
+## 6. (lịch sử) Các câu hỏi đã hỏi trước Phase 2
 
 1. Số vốn dự kiến và mức lỗ tối đa chấp nhận (để sàng lọc ngách theo vốn).
 2. Duyệt bộ ngưỡng ở mục 4.
