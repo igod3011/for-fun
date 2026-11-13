@@ -2,6 +2,20 @@
 
 Mới nhất ở trên. Mọi con số là lợi nhuận thực rút được từ pool, sau phí. "TEST" = 40% pool mới nhất, không dùng để chọn.
 
+## 13/11/2026: "mua sau cú giảm" và "tránh cú bật" đều không đạt
+388 pool tự nhiên, lệnh 0,2 SOL, phí 1,2%, cách thoát của bot, khớp cắt lỗ kiểu `close`; hai nửa thời gian.
+- Mốc so sánh (mua lúc 90 phút): n=76, +8,6% (CI 90% −10,6%..+31,9%), trung vị −10,3%; nửa đầu +18,4%, nửa sau +1,1%.
+- Mua ngay khi giá giảm ≥25/35/50% so với đỉnh 30 phút (tuổi 30–120 phút): −9,3% / −9,7% / −10,8% (n=160/143/104),
+  CI nằm hẳn dưới 0, âm ở cả hai nửa. Chờ bật +10% hoặc +20% rồi mới mua: −7%..−12%. Nới thoát (SL 25%) tệ hơn.
+  Trên cả 1.476 pool chuẩn: −28%..−33%.
+- Bỏ lệnh đã bật ≥30% từ đáy 15 phút: phần giữ lại −8,4% (n=49), phần bị bỏ +26,6% (n=25, chứa các lệnh thắng lớn);
+  nửa sau hai nhóm như nhau. Không giữ.
+- Sổ paper 11–13/11 (9 lệnh đóng, −0,46 SOL): hai lệnh −97%/−99% (0,39 SOL) đều có top 10 holder sụt xuống <15%
+  giữa lúc ghi nhận và lúc mua (87,8%→13,6%; 39,4%→6,3%); lệnh thứ ba có dấu hiệu này lỗ −10%. n=3, chưa là quy tắc.
+  Số holder tăng thì KHÔNG xấu (nhóm ≥1.000 holder lúc điền nến có kết quả tốt hơn; đây là thông tin sau lệnh).
+- Để kiểm chứng: từ 13/11 bộ thu thập chụp holder lúc ~90 phút cho pool qua bộ lọc tĩnh (`helius_90`,
+  `cohort.snaps.jsonl`). Đánh giá lại khi có ≥100 pool có `helius_90` đã điền nến.
+
 ## 11/11/2026 (tối): đào sâu toàn bộ dữ liệu, bộ lọc "pool tự nhiên"
 Câu hỏi: có cách vào/thoát hay nhóm pool nào dương không? Dữ liệu: 1.396 pool tốt nghiệp theo k, cộng nến 15 phút
 (tới 10 ngày) của 125 pool còn sống sau 3 giờ.

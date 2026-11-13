@@ -37,6 +37,6 @@ gates for real money); numbers and history are in `memebot/RESULTS.md`.
 - Weekly evaluation: the `weekly-eval` skill.
 
 ## Key entry points
-`collector_daemon.py` → `collect.py` → `store.py` (`cohort.jsonl`, `cohort.fills.jsonl`) · `report.py` ·
+`collector_daemon.py` → `collect.py` → `store.py` (`cohort.jsonl`, `cohort.fills.jsonl`, `cohort.snaps.jsonl`) · `report.py` ·
 `healthcheck.py` · `quote_check.py` · `ml/entry_timing.py` · `ml/rc_rules.py` · `ml/select_model.py` ·
 `ml/wallet_scores.py` · `bot/runner.py` (uses `strategy.py`, `paper.py`, `intel.py`, `telegram.py`, `config.py`).

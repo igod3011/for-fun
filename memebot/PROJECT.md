@@ -109,6 +109,7 @@ mint, GeckoTerminal, RugCheck, DexScreener, báo giá Jupiter) miễn phí và c
 |---|---|
 | `cohort.jsonl` | Một dòng ghi nhận mỗi pool PumpSwap mới; chỉ ghi nối |
 | `cohort.fills.jsonl`, `cohort.filled.txt` | Kết quả sau ≥3 giờ (nến, RugCheck, dự trữ) và chỉ mục pool đã điền |
+| `cohort.snaps.jsonl` | Ảnh chụp holder lần hai lúc pool ~90 phút tuổi (lúc bot quyết định), chỉ với pool qua bộ lọc tĩnh của bot; `store.load` gộp thành `helius_90`. Từ 13/11/2026, ~20 credit Helius mỗi pool (~110 pool/ngày) |
 | `bot_trades.jsonl`, `bot_series.jsonl`, `bot_state.json` | Nhật ký quyết định, dự trữ mỗi 15 giây của vị thế, trạng thái |
 | `archive/<ngày>/` | Các sổ paper cũ |
 | `daemon.log`, `bot.log`, `*.err` | Nhật ký |
@@ -120,6 +121,7 @@ cohort.jsonl:        pool, mint, name, created, reserve_usd, fdv_usd, registered
                      holders, top1/5/10/20_pct, pool_pct, top_holders, accounts_fetched   (Helius DAS)
   rc_reg:            creator, dev_pct, creator_rugs, creator_launches, insider_pct, insiders_detected, risks
 cohort.fills.jsonl:  pool, candles [[ts, o, h, l, c, volume_usd]], rugcheck, helius_fill {pool_sol, pool_tokens}, fetched_at
+cohort.snaps.jsonl:  pool, helius_90 {như helius_reg, thêm age_min}
 ```
 - Dòng cũ (trước 11/11/2026) chứa luôn nến trong `cohort.jsonl`; `store.load()` đọc được cả hai dạng.
   Chạy `memebot\migrate_store.bat` một lần để tách chúng ra (51 MB → 6 MB) và bật lịch thu thập mới.

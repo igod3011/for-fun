@@ -4,6 +4,8 @@
              newest PumpSwap pools from GeckoTerminal, whatever their later fate (unbiased cohort): reserve
              snapshot (free RPC); for canonical pump.fun pools also the pool's virtual reserve and mint authorities
              (free RPC), holders (Helius DAS) and RugCheck. One row per pool is APPENDED to cohort.jsonl.
+             The same pass takes a second holder snapshot of pools that just turned ~90 minutes old and pass the
+             bot's static filter (the moment the bot decides) -> cohort.snaps.jsonl, row["helius_90"].
   fill       python -m memebot.collect --out cohort.jsonl --fill --min-age-h 3 --max-fill 8
              for pools older than 3 h: 1-minute candles (GeckoTerminal), RugCheck, reserve snapshot = the real
              outcome. One row per pool is APPENDED to cohort.fills.jsonl (see store.py). Nothing is rewritten.
@@ -152,10 +154,45 @@ def register(path, max_pools, min_age_h, max_age_h):
                     p["rc_reg"] = {"error": type(e).__name__}
             f.write(json.dumps(p) + "\n")
             f.flush()
+    try:
+        snaps = snap90(path)
+    except Exception as e:                          # research extra: never breaks registration
+        snaps = f"failed ({type(e).__name__})"
     span = SPAN_MIN["v"]
-    print(f"registered {len(pools)} pools | pages cover {span:.0f} min of new pools"
+    print(f"registered {len(pools)} pools, 90-min snapshots {snaps} | pages cover {span:.0f} min of new pools"
           + (" -> GAP risk: run more often than this!" if span is not None and span < 6 else ""), flush=True)
     return len(pools)
+
+
+SNAP_FROM_MIN, SNAP_TO_MIN = 88, 100     # the bot decides at 90 min; a pass runs every 2 min
+
+
+def snap90(path, max_snaps=5, now=None):
+    """Second holder snapshot at the bot's decision time, for pools its static filter accepts. Research data only:
+    it makes rules such as "top 10 share collapsed since registration" testable (11/2026: both -97%/-99% paper
+    trades showed it, n=3). About 20 Helius credits per pool; bounded so registration is never delayed."""
+    from .bot.config import BotConfig
+    from .bot.strategy import entry_check
+    now = now or time.time()
+    done, cfg, n = store.snapped_pools(path), BotConfig(), 0
+    for p in store.tail_rows(path):
+        age = (now - p.get("created", 0)) / 60
+        if not SNAP_FROM_MIN <= age <= SNAP_TO_MIN or p.get("pool") in done or n >= max_snaps:
+            continue
+        try:
+            if not entry_check(p, cfg)[0]:
+                continue
+            snap = helius_snapshot(p)
+        except Exception as e:                      # one bad row must not kill the pass
+            print(f"snap90 skip {str(p.get('mint'))[:8]}: {type(e).__name__}", flush=True)
+            continue
+        if "error" in snap and age < SNAP_TO_MIN - 3:
+            continue                                # RPC hiccup: the next pass tries again while the pool is in the window
+        snap["age_min"] = round(age, 1)
+        store.append_snap(path, p["pool"], snap)
+        done.add(p["pool"])
+        n += 1
+    return n
 
 
 def fill(path, min_age_h, max_fill=8):

@@ -7,6 +7,7 @@ cohort.jsonl
 cohort.jsonl.before-split
 cohort.fills.jsonl
 cohort.filled.txt
+cohort.snaps.jsonl
 bot_trades.jsonl
 bot_series.jsonl
 bot_state.json

@@ -125,6 +125,42 @@ class CollectTest(unittest.TestCase):
         self.assertEqual(collect.register(self.path, 100, 0, 3), 0)
         self.assertNotIn("rc_reg", list(store.iter_jsonl(self.path))[-1])       # RugCheck only for canonical pools
 
+    def organic(self, pool, age_min, **h):
+        r = row(mint=pool + "pump", holders=150, virt_sol=17.5, top1_pct=0.03, **h)
+        r.update(pool=pool, created=NOW - int(age_min * 60), registered_at=NOW - int(age_min * 60) + 240)
+        return r
+
+    def test_pools_the_bot_would_accept_get_one_holder_snapshot_at_90_minutes(self):
+        write(self.path, [self.organic("OLD", 130), self.organic("DUE", 90), self.organic("YOUNG", 40),
+                          self.organic("FARM", 90, top10=0.05), reg("JUNK", age_h=1.5)])
+        calls = []
+        collect.helius_snapshot = lambda p, with_holders=True: calls.append(p["pool"]) or {
+            "pool_sol": 70.0, "pool_tokens": 2.4e8, "holders": 900, "top10_pct": 0.06}
+        size = os.path.getsize(self.path)
+        self.assertEqual(collect.snap90(self.path, now=NOW), 1)
+        self.assertEqual(calls, ["DUE"])                    # not the farm, not the too young/old, not the junk pool
+        self.assertEqual(collect.snap90(self.path, now=NOW + 120), 0)           # once per pool
+        self.assertEqual(os.path.getsize(self.path), size)                      # cohort.jsonl untouched
+        rows = {r["pool"]: r for r in store.load(self.path)}
+        self.assertEqual(rows["DUE"]["helius_90"]["top10_pct"], 0.06)
+        self.assertEqual(rows["DUE"]["helius_90"]["age_min"], 90.0)
+        self.assertNotIn("helius_90", rows["FARM"])
+
+    def test_snapshot_pass_is_bounded_retries_rpc_errors_and_never_breaks_registration(self):
+        write(self.path, [self.organic(f"P{i}", 90) for i in range(8)])
+        collect.helius_snapshot = lambda p, with_holders=True: {"error": "timeout"}
+        self.assertEqual(collect.snap90(self.path, now=NOW), 0)                 # retried next pass, nothing recorded
+        collect.helius_snapshot = lambda p, with_holders=True: {"pool_sol": 70.0, "pool_tokens": 2.4e8}
+        self.assertEqual(collect.snap90(self.path, max_snaps=5, now=NOW), 5)
+        self.assertEqual(collect.snap90(self.path, max_snaps=5, now=NOW), 3)
+        collect.candidate_pools = lambda *a: [{"pool": "NEW", "mint": "Xnotpmp", "name": "n", "created": NOW - 60}]
+        boom = collect.snap90
+        collect.snap90 = lambda path: 1 / 0
+        try:
+            self.assertEqual(collect.register(self.path, 100, 0, 3), 1)
+        finally:
+            collect.snap90 = boom
+
     def test_fill_appends_outcomes_and_never_touches_the_cohort_file(self):
         write(self.path, [reg("OLD1"), reg("OLD2"), reg("OLD3"), reg("YOUNG", age_h=1),
                           reg("INLINE", candles=[[1, 1, 1, 1, 1, 1]])])

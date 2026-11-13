@@ -3,6 +3,8 @@
   cohort.jsonl         one REGISTRATION row per pool, append-only (the bot reads its tail for new pools)
   cohort.fills.jsonl   one row per pool with everything fetched >=3 h later: candles, RugCheck, reserve snapshot
   cohort.filled.txt    pool addresses that have a fill row (cheap "already done?" index)
+  cohort.snaps.jsonl   one row per pool the bot's static filter accepts: a second holder snapshot taken when the
+                       pool is ~90 minutes old, i.e. when the bot decides (row["helius_90"] after load())
 
 Until 11/2026 the fill step wrote candles INTO cohort.jsonl and therefore rewrote the whole file (50 MB, growing
 10 MB/day) several times every 5 minutes. Rows written that way ("inline") are still understood everywhere;
@@ -29,6 +31,21 @@ def fills_path(path):
 
 def index_path(path):
     return _base(path) + ".filled.txt"
+
+
+def snaps_path(path):
+    return _base(path) + ".snaps.jsonl"
+
+
+def snapped_pools(path):
+    """Pools that already have a decision-time snapshot. Only the tail is read: a pool is snapshotted once, at
+    ~90 minutes, so anything older than the tail can never be a candidate again."""
+    return {r.get("pool") for r in tail_rows(snaps_path(path), 2_000_000)}
+
+
+def append_snap(path, pool, snap):
+    with open(snaps_path(path), "a", encoding="utf-8") as f:
+        f.write(json.dumps({"pool": pool, "helius_90": snap}) + "\n")
 
 
 def iter_jsonl(path, bad=None):
@@ -98,8 +115,11 @@ def load(path, candles=True, filled_only=False):
         if not candles:
             r["n_candles"] = len(r.pop("candles", None) or [])
         fills[r.get("pool")] = r
+    snaps = {r.get("pool"): r.get("helius_90") for r in iter_jsonl(snaps_path(path))}
     out = []
     for r in iter_jsonl(path):
+        if r.get("pool") in snaps:
+            r["helius_90"] = snaps[r["pool"]]
         if "candles" in r:                                 # filled inline, before the split
             r["filled"] = True
             if not candles:
@@ -149,7 +169,7 @@ def stats(path, out=print):
     rows = load(path, candles=False)
     filled = sum(bool(r.get("filled")) for r in rows)
     out(f"{len(rows)} pools registered, {filled} filled, {len(rows) - filled} waiting")
-    for p in (path, fills_path(path), index_path(path)):
+    for p in (path, fills_path(path), index_path(path), snaps_path(path)):
         out(f"  {os.path.basename(p):28} {os.path.getsize(p) / 1e6:8.1f} MB" if os.path.exists(p) else f"  {os.path.basename(p):28} (absent)")
     return len(rows), filled
 
