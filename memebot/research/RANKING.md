@@ -1,6 +1,6 @@
 # Bảng xếp hạng giả thuyết (tự sinh)
 
-Tạo lúc 2026-11-13 20:24 bằng `python -m memebot.research.run`. Đừng sửa tay: chạy lại lệnh đó.
+Tạo lúc 2026-11-16 09:14 bằng `python -m memebot.research.run`. Đừng sửa tay: chạy lại lệnh đó.
 Tài khoản nghiên cứu 100 USD, mức lỗ tối đa chấp nhận 50 USD. Mọi con số là sau phí.
 Xếp theo: đã qua ngưỡng trước, rồi tới cận dưới của lãi ròng một năm (không xếp theo trung bình).
 
@@ -10,10 +10,10 @@ Xếp theo: đã qua ngưỡng trước, rồi tới cận dưới của lãi r�
 | 2 | C1 | Ăn funding trung lập giá: mua spot, bán perp ở coin có funding cao | ĐẠT, chuyển sang paper | 136 | +0.2% | +0.1% .. +0.3% (95.0%) | +0.1% / +0.4% | 88% | +4 .. +6 USD | 0% |
 | 3 | F6 | Động lượng 1 tuần: mua nhóm 20% tăng mạnh nhất, bán nhóm 20% giảm mạnh nhất | Chưa chứng minh | 210 | +0.4% | -0.3% .. +1.2% (97.5%) | -0.2% / +1.0% | 47% | -9 .. +10 USD | 0% |
 | 4 | F1 | Theo xu hướng EMA 20/100 nến 1h trên PEPE và PUMP (10 USD x5) | Chưa chứng minh | 333 | +2.0% | -6.0% .. +12.4% (99.6%) | +5.8% / -1.7% | 23% | chạm mức dừng -50 .. +45 USD | 35% |
-| 5 | M2 | Chỉ pool tự nhiên (lọc dàn ví, loại ví giữ từ 50%) lúc 90 phút | Chưa chứng minh | 93 | +4.7% | -14.3% .. +30.4% (97.5%) | +13.1% / -3.6% | 31% | chạm mức dừng -50 .. +1130 USD | 32% |
-| 6 | M4 | Mua sau cú giảm từ 35% so với đỉnh 30 phút (pool tự nhiên) | Loại | 190 | -9.8% | -16.2% .. -3.2% (98.9%) | -9.9% / -9.7% | 21% | chạm mức dừng -50 .. chạm mức dừng -50 USD | 100% |
-| 7 | M1 | Mua mọi pool chuẩn pump.fun lúc 90 phút tuổi | Loại | 287 | -14.4% | -20.6% .. -7.2% (90.0%) | -1.4% / -27.2% | 27% | chạm mức dừng -50 .. chạm mức dừng -50 USD | 100% |
-| 8 | M3 | Mua nhanh: 5 phút sau khi lên sàn | Loại | 1698 | -22.5% | -27.6% .. -16.8% (98.0%) | -27.9% / -17.0% | 22% | chạm mức dừng -50 .. chạm mức dừng -50 USD | 100% |
+| 5 | M2 | Chỉ pool tự nhiên (lọc dàn ví, loại ví giữ từ 50%) lúc 90 phút | Chưa chứng minh | 139 | +0.9% | -12.2% .. +21.1% (97.5%) | +8.8% / -6.8% | 27% | chạm mức dừng -50 .. +246 USD | 72% |
+| 6 | M4 | Mua sau cú giảm từ 35% so với đỉnh 30 phút (pool tự nhiên) | Loại | 304 | -9.2% | -13.9% .. -4.8% (98.9%) | -10.3% / -8.1% | 19% | chạm mức dừng -50 .. chạm mức dừng -50 USD | 100% |
+| 7 | M1 | Mua mọi pool chuẩn pump.fun lúc 90 phút tuổi | Loại | 361 | -12.9% | -17.9% .. -7.3% (90.0%) | -10.9% / -14.8% | 26% | chạm mức dừng -50 .. chạm mức dừng -50 USD | 100% |
+| 8 | M3 | Mua nhanh: 5 phút sau khi lên sàn | Loại | 2314 | -22.9% | -27.0% .. -18.9% (98.0%) | -25.5% / -20.4% | 20% | chạm mức dừng -50 .. chạm mức dừng -50 USD | 100% |
 
 ## Chi tiết từng giả thuyết
 
@@ -52,32 +52,32 @@ Xếp theo: đã qua ngưỡng trước, rồi tới cận dưới của lãi r�
 ### M2. Chỉ pool tự nhiên (lọc dàn ví, loại ví giữ từ 50%) lúc 90 phút
 - Cơ chế: Loại bỏ pool do dàn ví hoặc một ví kiểm soát; phần còn lại có người mua thật.
 - Điều kiện loại bỏ (viết trước): Loại nếu sau 100 lệnh paper kỳ vọng vẫn không dương, hoặc tới cuối 11/2026 khoảng tin cậy còn chứa 0.
-- Kết luận: **Chưa chứng minh** (93 lệnh, cần 100; khoảng tin cậy chứa 0; không dương ở cả hai nửa; âm nếu bỏ 4 lệnh thắng lớn nhất).
-- Cỡ lệnh 5 USD, khoảng 4831 lệnh mỗi năm, dữ liệu 7 ngày, đã thử 4 biến thể. Trung vị -11.1%, lệnh tệ nhất -101.1%, profit factor 1.26, bỏ 4 lệnh thắng lớn nhất còn -11.7%, 20% lệnh gần nhất -14.4%.
-- Mô phỏng 1 năm (4831 lệnh, xáo ngẫu nhiên): lãi lỗ 5% xấu nhất +540 USD, trung vị +1123 USD, 5% tốt nhất +1729 USD.
+- Kết luận: **Chưa chứng minh** (khoảng tin cậy chứa 0; không dương ở cả hai nửa; âm nếu bỏ 4 lệnh thắng lớn nhất).
+- Cỡ lệnh 5 USD, khoảng 5257 lệnh mỗi năm, dữ liệu 10 ngày, đã thử 4 biến thể. Trung vị -11.1%, lệnh tệ nhất -101.1%, profit factor 1.05, bỏ 4 lệnh thắng lớn nhất còn -10.5%, 20% lệnh gần nhất -5.3%.
+- Mô phỏng 1 năm (5000 lệnh, xáo ngẫu nhiên): lãi lỗ 5% xấu nhất -258 USD, trung vị +236 USD, 5% tốt nhất +741 USD.
 - Lưu ý: đây là cấu hình bot paper đang chạy.
 
 ### M4. Mua sau cú giảm từ 35% so với đỉnh 30 phút (pool tự nhiên)
 - Cơ chế: Giá giảm quá đà sẽ hồi lại.
 - Điều kiện loại bỏ (viết trước): Loại nếu cả khoảng tin cậy nằm dưới 0.
 - Kết luận: **Loại** (cả khoảng tin cậy nằm dưới 0).
-- Cỡ lệnh 5 USD, khoảng 9765 lệnh mỗi năm, dữ liệu 7 ngày, đã thử 9 biến thể. Trung vị -11.1%, lệnh tệ nhất -99.7%, profit factor 0.45, bỏ 4 lệnh thắng lớn nhất còn -12.2%, 20% lệnh gần nhất -7.7%.
-- Mô phỏng 1 năm (5000 lệnh, xáo ngẫu nhiên): lãi lỗ 5% xấu nhất -2659 USD, trung vị -2459 USD, 5% tốt nhất -2258 USD.
+- Cỡ lệnh 5 USD, khoảng 11501 lệnh mỗi năm, dữ liệu 10 ngày, đã thử 9 biến thể. Trung vị -11.1%, lệnh tệ nhất -99.7%, profit factor 0.43, bỏ 4 lệnh thắng lớn nhất còn -10.7%, 20% lệnh gần nhất -6.1%.
+- Mô phỏng 1 năm (5000 lệnh, xáo ngẫu nhiên): lãi lỗ 5% xấu nhất -2480 USD, trung vị -2302 USD, 5% tốt nhất -2119 USD.
 - Lưu ý: đã thử 3 độ sâu x 3 kiểu chờ bật lại.
 
 ### M1. Mua mọi pool chuẩn pump.fun lúc 90 phút tuổi
 - Cơ chế: Pool sống sót 90 phút được cho là đã qua giai đoạn xả hàng.
 - Điều kiện loại bỏ (viết trước): Loại nếu cả khoảng tin cậy nằm dưới 0.
 - Kết luận: **Loại** (cả khoảng tin cậy nằm dưới 0).
-- Cỡ lệnh 5 USD, khoảng 14732 lệnh mỗi năm, dữ liệu 7 ngày, đã thử 1 biến thể. Trung vị -2.3%, lệnh tệ nhất -101.1%, profit factor 0.37, bỏ 4 lệnh thắng lớn nhất còn -19.8%, 20% lệnh gần nhất -19.0%.
-- Mô phỏng 1 năm (5000 lệnh, xáo ngẫu nhiên): lãi lỗ 5% xấu nhất -3976 USD, trung vị -3599 USD, 5% tốt nhất -3197 USD.
+- Cỡ lệnh 5 USD, khoảng 13653 lệnh mỗi năm, dữ liệu 10 ngày, đã thử 1 biến thể. Trung vị -7.2%, lệnh tệ nhất -101.1%, profit factor 0.38, bỏ 4 lệnh thắng lớn nhất còn -17.3%, 20% lệnh gần nhất -6.9%.
+- Mô phỏng 1 năm (5000 lệnh, xáo ngẫu nhiên): lãi lỗ 5% xấu nhất -3576 USD, trung vị -3215 USD, 5% tốt nhất -2855 USD.
 - Lưu ý: mọi pool chuẩn, không lọc holder.
 
 ### M3. Mua nhanh: 5 phút sau khi lên sàn
 - Cơ chế: Vào sớm hơn người khác ngay sau khi token tốt nghiệp.
 - Điều kiện loại bỏ (viết trước): Loại nếu cả khoảng tin cậy nằm dưới 0.
 - Kết luận: **Loại** (cả khoảng tin cậy nằm dưới 0).
-- Cỡ lệnh 5 USD, khoảng 87078 lệnh mỗi năm, dữ liệu 7 ngày, đã thử 5 biến thể. Trung vị -21.2%, lệnh tệ nhất -101.1%, profit factor 0.46, bỏ 4 lệnh thắng lớn nhất còn -24.6%, 20% lệnh gần nhất -12.5%.
-- Mô phỏng 1 năm (5000 lệnh, xáo ngẫu nhiên): lãi lỗ 5% xấu nhất -6138 USD, trung vị -5625 USD, 5% tốt nhất -5035 USD.
+- Cỡ lệnh 5 USD, khoảng 87457 lệnh mỗi năm, dữ liệu 10 ngày, đã thử 5 biến thể. Trung vị -18.6%, lệnh tệ nhất -101.1%, profit factor 0.42, bỏ 4 lệnh thắng lớn nhất còn -24.5%, 20% lệnh gần nhất -27.7%.
+- Mô phỏng 1 năm (5000 lệnh, xáo ngẫu nhiên): lãi lỗ 5% xấu nhất -6201 USD, trung vị -5737 USD, 5% tốt nhất -5250 USD.
 - Lưu ý: đã thử 2, 3, 5, 10, 20 phút.
 

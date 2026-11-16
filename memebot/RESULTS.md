@@ -2,6 +2,24 @@
 
 Mới nhất ở trên. Mọi con số là lợi nhuận thực rút được từ pool, sau phí. "TEST" = 40% pool mới nhất, không dùng để chọn.
 
+## 16/11/2026: dừng thu thập, tổng kết 10 ngày dữ liệu
+Bot và bộ thu thập dừng lúc 09:12 ngày 16/11 theo yêu cầu. Dữ liệu: 06/11 10:57 đến 16/11 09:03, 23.116 pool, trong đó
+2.943 pool chuẩn pump.fun (2.890 đã có kết quả) và 944 pool tự nhiên. Hai khoảng trống: 09/11 19:54 (14,1 giờ) và
+11/11 19:28 (18,4 giờ). Đóng gói: `python -m memebot.export_data`.
+- Số phận pool chuẩn sau ≥3 giờ: 71% còn dưới 10% SOL so với lúc ghi nhận, 85% dưới một nửa, 9% tăng. Pool tự
+  nhiên: 52% / 82% / 10%.
+- Engine trên 10 ngày: M1 −12,9% (n=361, loại), M2 +0,9% (n=139, CI −12,2%..+21,1%, nửa đầu +8,8%, nửa sau −6,8%,
+  chưa chứng minh), M3 −22,9% (loại), M4 −9,2% (loại).
+- Sổ paper 11–16/11: 66 lệnh, −1,570 SOL, thắng 20%, profit factor 0,36. 6 lệnh mất hơn 0,1 SOL = −1,111 SOL; 60
+  lệnh còn lại −0,459 SOL. Paper xấu hơn backtest (−12% vốn lệnh mỗi lệnh so với +0,9%).
+- Theo ví giỏi (`wallet_scores`, 544 pool tìm ví, 363 pool kiểm tra): FAIL. Có ví chọn sẵn: thắng 8%, TB −50%
+  (n=26); không có: thắng 9%, TB −53% (n=337); chênh lệch CI 90% −13%..+19%.
+- Quy tắc "top 10 holder sụt lúc 90 phút" (`helius_90`, 49 lệnh có ảnh chụp): nhóm sụt −3,1% (n=19), nhóm giữ
+  −7,2% (n=30); không khác biệt, không giữ. Trong sổ paper nhóm sụt có 5/6 lệnh mất lớn nhưng trung bình hai nhóm
+  đều âm (−0,035 và −0,017 SOL mỗi lệnh).
+- Kết luận: sau 10 ngày và hơn 2.900 pool chuẩn, không quy tắc nào trên pool đã lên sàn có kỳ vọng dương được chứng
+  minh. Điểm dừng cuối 11/2026 của PROJECT.md được áp dụng sớm cho hướng này.
+
 ## 13/11/2026: "mua sau cú giảm" và "tránh cú bật" đều không đạt
 388 pool tự nhiên, lệnh 0,2 SOL, phí 1,2%, cách thoát của bot, khớp cắt lỗ kiểu `close`; hai nửa thời gian.
 - Mốc so sánh (mua lúc 90 phút): n=76, +8,6% (CI 90% −10,6%..+31,9%), trung vị −10,3%; nửa đầu +18,4%, nửa sau +1,1%.

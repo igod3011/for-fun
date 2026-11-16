@@ -298,3 +298,21 @@ class EntrySnapshotTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ExportTest(unittest.TestCase):
+    def test_export_packs_existing_files_and_archives_and_changes_nothing(self):
+        import zipfile
+        from memebot import export_data
+        root = tempfile.mkdtemp()
+        os.makedirs(os.path.join(root, "archive", "old"))
+        for name, text in (("cohort.jsonl", "{}\n"), ("bot_trades.jsonl", "x\n"), ("archive/old/bot_state.json", "{}")):
+            with open(os.path.join(root, name), "w", newline="") as f:
+                f.write(text)
+        out = os.path.join(root, "export", "data.zip")
+        packed = export_data.export(out, root=root, log=lambda *a: None)
+        with zipfile.ZipFile(out) as z:
+            self.assertEqual(sorted(z.namelist()), ["archive/old/bot_state.json", "bot_trades.jsonl", "cohort.jsonl"])
+            self.assertEqual(z.read("cohort.jsonl"), b"{}\n")
+        self.assertEqual(len(packed), 3)                       # missing files (fills, snaps, ...) are skipped
+        self.assertTrue(os.path.exists(os.path.join(root, "cohort.jsonl")))
