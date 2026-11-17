@@ -30,3 +30,14 @@ method and the go/no-go gates for real money. `App.js`/`package.json` at the roo
 ## Key entry points
 `collector_daemon.py` → `collect.py` → `cohort.jsonl` · `report.py` · `healthcheck.py` · `ml/entry_timing.py` ·
 `ml/wallet_scores.py` · `bot/runner.py` (uses `strategy.py`, `paper.py`, `intel.py`, `telegram.py`, `config.py`).
+
+## Project tracking (Notion)
+The user follows progress in Notion page "MemeRadar: Quản lý dự án"
+(https://app.notion.com/p/41b5b058739681c687ced7b24c9279da). After every completed task or meaningful update,
+update Notion in the same turn (Vietnamese text):
+- Tasks `collection://41b5b058-7396-8117-8cd7-000b8bbbb6d1`: set "Trạng thái" (Chưa làm/Đang làm/Bị chặn/Xong) and
+  "Hoàn thành ngày"; add new tasks with Giai đoạn, Mảng, Tuần, Hạn.
+- Nhật ký cập nhật `collection://41b5b058-7396-813f-9926-000b2b106e52`: one row per update (Ngày, Loại, Tóm tắt,
+  Việc liên quan, Link).
+- KPI `collection://41b5b058-7396-81fc-b942-000bafce522b`: refresh "Hiện tại", "Đạt", "Đo lần cuối" after measurements.
+- Chi phí `collection://41b5b058-7396-817c-a600-000b0d1181dc`: record actual spend.
