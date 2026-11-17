@@ -22,6 +22,7 @@ def row(mint="Abcpump", sol=85.0, tok=2.07e8, top10=0.2, age_s=300, **h):
 
 def cfg_in(tmp, **kw):
     kw.setdefault("entry_delay_min", 0.0)               # most tests: buy at discovery
+    kw.setdefault("virtual_quote_sol", 0.0)             # mechanics on plain constant product; virtual reserve: test_amm.py
     return replace(BotConfig(), state_path=os.path.join(tmp, "s.json"), log_path=os.path.join(tmp, "l.jsonl"),
                    series_path=os.path.join(tmp, "series.jsonl"), **kw)
 
@@ -31,10 +32,16 @@ class EntryTests(unittest.TestCase):
 
     def test_canonical_pool_passes(self):
         self.assertEqual(entry_check(row(), self.cfg), (True, []))
+        self.assertEqual(entry_check(row(top10=0.9, holders=300, top1_pct=0.3, virt_sol=17.58), self.cfg), (True, []))
+        loose = replace(self.cfg, max_holders_reg=None, min_top10=None, max_top1=None)
+        self.assertEqual(entry_check(row(top10=0.05, holders=5000, top1_pct=0.9), loose), (True, []))   # rules can be disabled
 
     def test_rejections(self):
         cases = {"not a pump.fun mint": row(mint="XYZabc"), "pool only": row(sol=5, tok=2e9),
-                 "non-canonical": row(sol=559, tok=8.7e10), "top10": row(top10=0.9),
+                 "non-canonical": row(sol=559, tok=8.7e10), "top10 only": row(top10=0.05),
+                 "wallet farm: 2500 holders": row(holders=2500), "no holder data": row(top10=None),
+                 "one holder controls 80%": row(top10=0.8, top1_pct=0.7995),
+                 "not a pump.fun migration": row(virt_sol=0.0),
                  "mint authority": row(mint_authority="X"), "too old": row(age_s=3600)}
         for want, r in cases.items():
             ok, why = entry_check(r, self.cfg)
@@ -45,7 +52,7 @@ class EntryTests(unittest.TestCase):
 class ExitTests(unittest.TestCase):
     # mechanics are tested with the old rule set (it exercises partial take-profits); new defaults tested below
     cfg = replace(BotConfig(), stop_loss=0.25, take_profit=[[0.5, 0.5], [1.0, 0.5]], trail_activate=0.3, trail=0.2,
-                  max_hold_min=120.0)
+                  max_hold_min=120.0, virtual_quote_sol=0.0)
 
     def pos(self):
         return Position("M", "P", "n", tokens=1.2e5, cost_sol=0.05, opened_at=NOW, entry_pool_sol=85, peak_pool_sol=85)
@@ -77,6 +84,7 @@ class ExitTests(unittest.TestCase):
     def test_new_default_rules_tight_stop_and_trailing(self):
         cfg = BotConfig()
         self.assertEqual((cfg.entry_delay_min, cfg.stop_loss, cfg.take_profit, cfg.max_hold_min), (90.0, 0.10, [], 60.0))
+        cfg = replace(cfg, virtual_quote_sol=0.0)
         p = self.pos()
         frac, why = exit_decision(p, 85 * 0.94, 2.07e8 / 0.94, NOW, cfg)           # price -12%
         self.assertEqual((frac, why.startswith("stop loss")), (1.0, True))
@@ -109,7 +117,7 @@ class BotTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
         self.res = {"sol": 85.0, "tok": 2.07e8}
-        self.rows = [row("Aaapump"), row("XYZnotpmp"), row("Bbbpump", top10=0.95)]
+        self.rows = [row("Aaapump"), row("XYZnotpmp"), row("Bbbpump", top10=0.05)]
         self.tg = FakeTG()
         self.bot = Bot(cfg_in(self.tmp), self.tg, reserves=lambda pool, mint: (self.res["sol"], self.res["tok"]),
                        rows=lambda path, **kw: self.rows)
@@ -130,6 +138,15 @@ class BotTests(unittest.TestCase):
 
     def test_pause_blocks_new_entries_and_resume(self):
         self.assertIn("paused", self.bot.command("/pause"))
+        before, pnl = self.bot.p.balance, self.bot.p.total_pnl
+        self.assertIn("+5 paper SOL", self.bot.command("/topup 5"))
+        self.assertAlmostEqual(self.bot.p.balance, before + 5)
+        self.assertEqual(self.bot.p.total_pnl, pnl)                 # a deposit is not profit
+        self.assertEqual(Paper(self.bot.cfg).deposited, 5)          # survives a restart
+        for bad in ("/topup", "/topup abc", "/topup -3", "/topup 1000"):
+            self.assertIn("usage", self.bot.command(bad))
+        self.assertAlmostEqual(self.bot.p.balance, before + 5)
+        self.assertIn('"deposit"', open(self.bot.cfg.log_path).read())
         self.bot.discover()
         self.assertEqual(self.bot.p.positions, {})
         self.bot.command("/resume")

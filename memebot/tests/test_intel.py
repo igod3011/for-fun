@@ -38,7 +38,7 @@ class ParseTest(unittest.TestCase):
         cfg = BotConfig()
         ok, why = intel_check(parse_rugcheck(REP), parse_dex(DEX, "POOL"), cfg)
         self.assertFalse(ok)
-        for want in ("dev holds 5.0%", "creator has rugged", "insiders/bundle 12%", "already +567% in 1h"):
+        for want in ("dev holds 5.0%", "creator has rugged", "already +567% in 1h"):
             self.assertTrue(any(want in w for w in why), (want, why))
         self.assertEqual(intel_check(CLEAN_RC, CLEAN_DX, cfg), (True, []))
         self.assertFalse(intel_check(None, CLEAN_DX, cfg)[0])           # no RugCheck data: do not buy blind
@@ -63,7 +63,8 @@ class BotIntelTest(unittest.TestCase):
         buy = self.tg.sent[-1]
         self.assertIn("MC $39.8K", buy)
         self.assertIn("Giá $0.00003970", buy)
-        self.assertIn("Dev 0.0% | Insider 2%", buy)
+        self.assertIn("Dev 0.0%", buy)
+        self.assertNotIn("Insider", buy)                                    # the dead insider rule is gone
         self.res.update(sol=60.0, tok=2.07e8 * 85 / 60)                    # dump -> stop loss
         self.bot.manage()
         sell = self.tg.sent[-1]

@@ -7,7 +7,7 @@ from memebot.bot.config import BotConfig
 from memebot.bot.runner import Bot
 from memebot.bot.wallets import WalletWatcher, buys_in_tx
 from memebot.helius import top_owners
-from memebot.ml.wallet_scores import evaluate, score_wallets
+from memebot.ml.wallet_scores import evaluate, score_wallets, verdict
 from memebot.tests.test_bot import FakeTG, cfg_in
 
 WSOL = "So11111111111111111111111111111111111111112"
@@ -44,6 +44,8 @@ class WalletScoreTest(unittest.TestCase):
         self.assertNotIn("DEV", [w for *_, w in scored])
         hit, miss, dh, dm = evaluate(data[720:], {"SMART"})
         self.assertGreater(sum(v > 0 for v in hit) / len(hit), sum(v > 0 for v in miss) / len(miss) + 0.2)
+        ok, text = verdict(hit, miss)
+        self.assertTrue(ok and text.startswith("PASS"), text)
 
     def test_lucky_wallets_do_not_carry_over(self):
         data = cohort(random.Random(2), 1200, smart_edge=False)
@@ -52,6 +54,17 @@ class WalletScoreTest(unittest.TestCase):
         hit, miss, _, _ = evaluate(data[720:], sel)
         diff = sum(v > 0 for v in hit) / max(len(hit), 1) - sum(v > 0 for v in miss) / max(len(miss), 1)
         self.assertLess(diff, 0.1)
+        ok, text = verdict(hit, miss)
+        self.assertFalse(ok, text)
+        self.assertTrue(text.startswith("FAIL"))                    # the bot's load_watchlist keys on this word
+
+    def test_verdict_needs_enough_pools_and_a_confidence_interval_above_zero(self):
+        self.assertFalse(verdict([0.5] * 19, [-0.9] * 200)[0])                         # 19 pools: too few, however good
+        rng = random.Random(3)
+        noisy_hit = [0.6 if rng.random() < 0.20 else -0.9 for _ in range(25)]          # 5 points better: old rule passed
+        noisy_miss = [0.6 if rng.random() < 0.14 else -0.9 for _ in range(400)]
+        self.assertFalse(verdict(noisy_hit, noisy_miss)[0])
+        self.assertTrue(verdict([0.5] * 30 + [-0.9] * 10, [0.5] * 40 + [-0.9] * 360)[0])
 
 
 def tx(wallet, pre, post, err=None):

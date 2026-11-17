@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rà soát memebot 11/11/2026</title>
+<style>
+:root{
+  --bg:#f6f5f1; --card:#ffffff; --ink:#1c1b19; --muted:#66625b; --line:#dedbd3;
+  --accent:#1f5f8b; --good:#1d7a4f; --bad:#b3392f; --warn:#a56a00; --chip:#eeece6; --code:#f0eee8;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#161614; --card:#1f1f1c; --ink:#ecebe6; --muted:#a09c93; --line:#34332f;
+    --accent:#7db8e0; --good:#62c794; --bad:#ef8377; --warn:#e2b04c; --chip:#2a2a26; --code:#2a2a26;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#161614; --card:#1f1f1c; --ink:#ecebe6; --muted:#a09c93; --line:#34332f;
+  --accent:#7db8e0; --good:#62c794; --bad:#ef8377; --warn:#e2b04c; --chip:#2a2a26; --code:#2a2a26;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:920px;margin:0 auto;padding:28px 16px 120px}
+h1{font-size:1.7rem;line-height:1.2;margin:0 0 6px}
+h2{font-size:1.25rem;margin:40px 0 12px;padding-top:8px;border-top:2px solid var(--line)}
+h3{font-size:1.02rem;margin:0 0 6px}
+p{margin:8px 0}
+.sub{color:var(--muted);margin:0 0 20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin:12px 0}
+.verdict{border-left:5px solid var(--bad)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:14px 0}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.stat b{display:block;font-size:1.45rem;line-height:1.2;font-variant-numeric:tabular-nums}
+.stat span{color:var(--muted);font-size:.86rem}
+.neg{color:var(--bad)} .pos{color:var(--good)}
+ul{margin:6px 0 6px 0;padding-left:20px} li{margin:4px 0}
+code{background:var(--code);padding:1px 5px;border-radius:4px;font:0.88em ui-monospace,Consolas,monospace;word-break:break-word}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.93rem;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:.82rem}
+td.n,th.n{text-align:right;white-space:nowrap}
+.chip{display:inline-block;background:var(--chip);border-radius:99px;padding:1px 9px;font-size:.76rem;color:var(--muted);margin-right:4px;white-space:nowrap}
+.chip.hi{color:var(--bad)} .chip.rec{color:var(--good)} .chip.wait{color:var(--warn)}
+.prop{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:start}
+.prop input{width:20px;height:20px;margin-top:3px;accent-color:var(--accent)}
+.prop .id{font-weight:700;color:var(--accent)}
+.kv{color:var(--muted);font-size:.92rem}
+.kv b{color:var(--ink);font-weight:600}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 16px}
+.bar div{max-width:920px;margin:0 auto;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:var(--card);cursor:pointer}
+button.ghost{background:transparent;color:var(--accent)}
+#out{flex:1;min-width:180px;color:var(--muted);font-size:.9rem}
+</style>
+</head>
+<body>
+<main>
+<h1>Rà soát toàn bộ dự án memebot</h1>
+<p class="sub">Ngày 11/11/2026 · dữ liệu: 10.629 pool (06–11/11) · 80/80 test đạt sau khi sửa</p>
+
+<div class="card verdict">
+<h3>Kết luận ngắn</h3>
+<p><b>Bot hiện chưa có lợi thế, và hai nền móng đo lường của dự án đã sai.</b> Cả hai đã được sửa trong lần rà soát này. Với phép đo đúng, cấu hình hiện tại lỗ khoảng 28% mỗi lệnh ngoài mẫu. Bộ lọc tốt nhất tìm được đưa con số về khoảng −4%, vẫn âm.</p>
+<p>Điều có giá trị nhất tìm được: 64% pool "tốt nghiệp thật" kết thúc bằng một cú xả toàn bộ nguồn cung từ dàn ví, và dàn ví đó nhận diện được ngay lúc ghi nhận qua số holder. Hướng đi tiếp theo là chọn token, không phải tinh chỉnh điểm vào hay cắt lỗ.</p>
+</div>
+
+<div class="grid">
+<div class="stat"><b class="neg">−28,1%</b><span>mỗi lệnh trên TEST, cấu hình hiện tại (n=106, CI 90% −38,1..−16,5)</span></div>
+<div class="stat"><b class="neg">−0,998 SOL</b><span>bot paper sau 15 lệnh; hết vốn từ 10/11</span></div>
+<div class="stat"><b>64%</b><span>pool tốt nghiệp thật bị xả gần hết nguồn cung trong 3 giờ (840/1.308)</span></div>
+<div class="stat"><b>17,584 SOL</b><span>dự trữ ảo trong mỗi pool, trước đây bị bỏ sót trong mọi phép tính</span></div>
+</div>
+
+<h2>1. Hai phát hiện làm thay đổi cách hiểu dữ liệu</h2>
+
+<div class="card">
+<h3>Công thức AMM của dự án sai từ đầu</h3>
+<p>Dự án tính mọi thứ theo <code>SOL × token = k</code>. Pool PumpSwap do pump.fun migrate thực tế định giá theo <code>(SOL thật + dự trữ ảo) × token = K</code>.</p>
+<ul>
+<li><b>Bằng chứng on-chain:</b> tài khoản pool chứa một số u64 tại byte 245 bằng 17.583.953.695 lamports (17,584 SOL), gần như giống nhau ở cả 3 pool đã đọc.</li>
+<li><b>Bằng chứng từ dữ liệu:</b> 1.183 pool trong cohort cho dự trữ ảo suy ra có trung vị 17,42 SOL (khoảng tứ phân vị 17,02–17,54).</li>
+<li><b>Hệ quả cũ:</b> mọi biến động giá bị phóng đại (ví dụ pool 85→60 SOL: thật −42,9%, công thức cũ −46,6%); lợi nhuận của token thắng bị thổi lên tới khoảng 20%.</li>
+<li><b>Kết quả sau khi sửa:</b> kết luận chung không đổi (TEST −28,1% so với −28,3%), nhưng từ nay các con số khớp với số SOL pool thật sự trả.</li>
+</ul>
+</div>
+
+<div class="card">
+<h3>"Rug" là xả hàng từ dàn ví, không phải rút thanh khoản</h3>
+<p>LP của các pool này đã bị đốt (đọc on-chain: nguồn cung LP mint = 0), nên không ai rút được thanh khoản. Thứ giết bot là một giao dịch bán gần như toàn bộ nguồn cung.</p>
+<ul>
+<li><b>Ví dụ bot ghi lại (ANSEM, 09/11):</b> giữa hai lần đọc cách nhau 15 giây, pool đi từ 245,81 SOL × 67 triệu token xuống 0,43 SOL × 985 triệu token. Công thức mới tái tạo đúng con số 0,43 SOL.</li>
+<li><b>Dấu hiệu dàn ví:</b> nhóm bị xả có trung vị 2.004 holder chỉ 5 phút sau khi tạo pool, top 10 chỉ giữ 25%. Nhóm không bị xả có trung vị 335 holder.</li>
+<li><b>Ý nghĩa:</b> không tốc độ cắt lỗ nào thoát kịp một giao dịch đơn. Chỉ có thể tránh từ trước khi mua.</li>
+</ul>
+<div class="tw"><table>
+<tr><th>Số holder lúc ghi nhận</th><th class="n">Số pool</th><th class="n">Bị xả</th><th class="n">Còn nguyên</th></tr>
+<tr><td>dưới 200</td><td class="n">192</td><td class="n">39%</td><td class="n">36%</td></tr>
+<tr><td>200–1.000</td><td class="n">418</td><td class="n">30%</td><td class="n">13%</td></tr>
+<tr><td>1.000–1.500</td><td class="n">160</td><td class="n neg">94%</td><td class="n">2%</td></tr>
+<tr><td>từ 1.500</td><td class="n">538</td><td class="n neg">91%</td><td class="n">8%</td></tr>
+</table></div>
+<p class="kv">"Bị xả" = tích dự trữ còn dưới 10% lúc điền nến; phần còn lại là nhóm giảm một phần.</p>
+</div>
+
+<h2>2. Đã sửa trong lần này</h2>
+<div class="card">
+<ul>
+<li><b>Công thức AMM có dự trữ ảo</b> trong <code>bot/amm.py</code>; bot, backtest, báo cáo và chấm điểm ví đều dùng chung.</li>
+<li><b>Backtest không còn coi cắt lỗ khớp đúng mức stop</b> (<code>--stop-fill close</code> mặc định). Đây là nguồn gốc con số +3% ảo trước đây.</li>
+<li><b>Bot bỏ sót token khi RPC lỗi:</b> trước đây token bị đánh dấu "đã xét" trước khi đọc pool, lỗi mạng là mất hẳn mà không ghi nhật ký. Nay thử lại ở vòng sau.</li>
+<li><b>Một pool đọc lỗi chặn việc thoát các vị thế khác:</b> nay xử lý từng vị thế riêng.</li>
+<li><b>Danh sách token đã xét bị cắt theo bảng chữ cái</b> khi vượt 5.000 (sẽ xảy ra trong khoảng một ngày nữa), có thể mua lại token cũ sau khi khởi động lại. Nay cắt theo thứ tự thời gian.</li>
+<li><b>Bot hết vốn mà im lặng suốt một ngày:</b> nay báo Telegram một lần, và <code>healthcheck</code> có thêm dòng kiểm tra bot.</li>
+<li><b>Chế độ theo ví</b> bỏ qua kết luận FAIL của <code>wallet_scores</code>: nay FAIL thì danh sách ví rỗng.</li>
+<li><b>Lỗi crash</b> trong <code>helius.py --inspect</code> (thiếu hằng số <code>SYSTEM_PROGRAM</code>).</li>
+<li><b>Công cụ mới</b> <code>ml/rc_rules.py</code>: kiểm tra từng quy tắc RugCheck và số holder theo hai nửa thời gian, có khoảng tin cậy.</li>
+<li><b>Tài liệu sai lệch:</b> README của bot ghi ≥20 SOL (code là 40), cỡ lệnh 0,05 và 0,2 cùng lúc, thiếu lệnh <code>/review</code>, còn dẫn con số +3%.</li>
+</ul>
+<p class="kv"><b>Lưu ý:</b> bộ thu thập dùng code mới ngay (mỗi lần chạy là một tiến trình mới). Bot đang chạy vẫn dùng code cũ cho tới khi bạn chạy lại <code>memebot\start_bot.bat</code>; bot đang không giữ vị thế nào nên khởi động lại là an toàn.</p>
+</div>
+
+<h2>3. Đề xuất chờ bạn duyệt</h2>
+<p class="sub">Tích vào mục đồng ý, rồi bấm "Sao chép lựa chọn" ở cuối trang và dán vào chat.</p>
+
+<h3>A. Chiến lược và độ chính xác chuyên môn</h3>
+
+<div class="card"><label class="prop"><input type="checkbox" data-id="A1" checked>
+<div><h3><span class="id">A1</span> Bỏ quy tắc "top 10 holder &gt;50%" <span class="chip rec">nên làm</span><span class="chip hi">ảnh hưởng lớn</span></h3>
+<p>Quy tắc này đang loại nhầm nhóm tốt hơn. Trên lệnh kiểu bot, nhóm bị loại trung bình −4% (n=120), nhóm được giữ −22% (n=97); ngược chiều ở cả hai nửa thời gian, khoảng tin cậy của chênh lệch −35%..−3%.</p>
+<p class="kv"><b>Lý do:</b> dàn ví chia nhỏ nguồn cung nên trông "phân tán đẹp"; token thật thường có vài ví lớn. <b>Rủi ro:</b> thấp, chỉ đổi một tham số paper.</p></div></label></div>
+
+<div class="card"><label class="prop"><input type="checkbox" data-id="A2" checked>
+<div><h3><span class="id">A2</span> Thêm bộ lọc dàn ví: bỏ pool có ≥1.000 holder hoặc top 10 &lt;15% lúc ghi nhận <span class="chip rec">nên làm</span><span class="chip hi">ảnh hưởng lớn</span></h3>
+<div class="tw"><table>
+<tr><th>Lệnh kiểu bot (+90 phút)</th><th class="n">Bị loại</th><th class="n">Giữ lại</th><th class="n">Chênh lệch nửa đầu / nửa sau</th><th class="n">CI 90%</th></tr>
+<tr><td>≥1.000 holder</td><td class="n">−21% (68)</td><td class="n">−8% (149)</td><td class="n">+16% / +14%</td><td class="n">+1..+29</td></tr>
+<tr><td>top 10 &lt;15%</td><td class="n">−37% (44)</td><td class="n">−6% (173)</td><td class="n">+20% / +37%</td><td class="n">+17..+47</td></tr>
+<tr><td>một trong hai</td><td class="n">−25% (83)</td><td class="n">−4% (134)</td><td class="n">+17% / +25%</td><td class="n">+8..+38</td></tr>
+</table></div>
+<p class="kv"><b>Giới hạn:</b> nhóm giữ lại vẫn âm, và tôi đã thử nhiều ngưỡng nên có nguy cơ khớp quá mức. Cần đo tiếp trên dữ liệu mới và trên paper.</p></div></label></div>
+
+<div class="card"><label class="prop"><input type="checkbox" data-id="A3" checked>
+<div><h3><span class="id">A3</span> Nạp lại vốn paper và mở sổ mới sau A1 + A2 <span class="chip rec">nên làm</span></h3>
+<p>Bot đã ngừng đo từ 10/11. Tôi sẽ lưu sổ cũ sang file riêng, đặt lại số dư 1 SOL, và đưa từng lệnh Command Prompt để bạn khởi động lại. Không nên nạp lại với cấu hình cũ: nó đã được chứng minh lỗ.</p></div></label></div>
+
+<div class="card"><label class="prop"><input type="checkbox" data-id="A4" checked>
+<div><h3><span class="id">A4</span> Chuyển trọng tâm nghiên cứu sang mô hình "pool này có bị xả không" <span class="chip rec">nên làm</span><span class="chip hi">ảnh hưởng lớn</span></h3>
+<p>167 pool không bị xả có lợi nhuận giữ 3 giờ trung bình +81%, trung vị +7%, 80% có lãi. Đây là số nhìn lại sau nên không dùng trực tiếp được, nhưng nó cho thấy toàn bộ bài toán nằm ở việc đoán trước nhóm này từ đặc trưng lúc ghi nhận (số holder, phân bố, mức SOL, cờ RugCheck). Đề xuất ngừng dò lưới 480 cấu hình thoát lệnh.</p>
+<p class="kv"><b>Công sức:</b> vừa. Chỉ thư viện chuẩn (hồi quy logistic tự viết hoặc cây quyết định đơn giản), chia theo thời gian.</p></div></label></div>
+
+<div class="card"><label class="prop"><input type="checkbox" data-id="A5" checked>
+<div><h3><span class="id">A5</span> Chụp holder lần hai ngay trước khi mua <span class="chip rec">nên làm</span></h3>
+<p>Hiện chỉ có số holder lúc pool 5 phút tuổi, còn bot mua lúc 90 phút. Chỉ chụp cho token đã qua mọi bộ lọc khác (vài chục token mỗi ngày, khoảng 10–20 credit Helius mỗi token), nên tốn dưới 2.000 credit/ngày. Tốc độ tăng holder là dấu hiệu dàn ví mạnh hơn một ảnh chụp đơn lẻ.</p></div></label></div>
+
+<div class="card"><label class="prop"><input type="checkbox" data-id="A6" checked>
+<div><h3><span class="id">A6</span> Đối chiếu công thức với báo giá Jupiter (chỉ lấy báo giá, không ví, không key) <span class="chip rec">nên làm trước tiền thật</span></h3>
+<p>Phí swap 0,5% trong code là giả định và tôi không xác minh được mức phí hiện hành của PumpSwap. Một công cụ nhỏ so số SOL bot tính ra với báo giá thật sẽ kiểm tra cùng lúc phí, dự trữ ảo và token chặn bán. Vẫn thuộc phạm vi paper.</p></div></label></div>
+
+<div class="card"><label class="prop"><input type="checkbox" data-id="A7" checked>
+<div><h3><span class="id">A7</span> Đọc dự trữ ảo theo từng pool lúc ghi nhận <span class="chip rec">nên làm</span></h3>
+<p>Hiện dùng hằng số 17,584 SOL. Nếu pump.fun đổi giá trị này, mọi phép tính lệch mà không ai biết. Một lệnh RPC công khai miễn phí cho mỗi pool tốt nghiệp thật là đủ.</p></div></label></div>
+
+<div class="card"><label class="prop"><input type="checkbox" data-id="A8" checked>
+<div><h3><span class="id">A8</span> Sửa hoặc bỏ hai quy tắc RugCheck không hoạt động <span class="chip wait">chờ thêm dữ liệu</span></h3>
+<p>Trên 348 pool: "dev giữ &gt;3%" kích hoạt 0 lần; "insider &gt;10%" kích hoạt 0 lần vì trường <code>insider_pct</code> luôn bằng 0. Cờ <code>High holder correlation</code> của RugCheck lại có tín hiệu (−96% so với −66%, CI +17..+45), nhưng mới 2 ngày dữ liệu. Đề xuất: bỏ quy tắc insider chết, theo dõi cờ correlation thêm một tuần rồi quyết định.</p></div></label></div>
+
+<div class="card"><label class="prop"><input type="checkbox" data-id="A9" checked>
+<div><h3><span class="id">A9</span> Sửa tiêu chí PASS của <code>wallet_scores</code> trước lần chạy đầu (khoảng 15–16/11) <span class="chip rec">nên làm</span></h3>
+<ul>
+<li><b>Tiêu chí hiện tại quá dễ:</b> chỉ cần tỷ lệ thắng cao hơn 5 điểm phần trăm với 20 pool, không có khoảng tin cậy, không xét lợi nhuận trung bình.</li>
+<li><b>Đo sai đối tượng:</b> "nằm trong top 10 holder lúc ghi nhận" khác với "ví mua trước khi giá tăng"; phần lớn top holder ở các pool bị xả chính là dàn ví.</li>
+</ul></div></label></div>
+
+<h3>B. Vận hành và hiệu năng</h3>
+
+<div class="card"><label class="prop"><input type="checkbox" data-id="B1" checked>
+<div><h3><span class="id">B1</span> Đưa code lên git ngay <span class="chip hi">khẩn</span></h3>
+<p>Thư mục trên máy là bản giải nén zip. Lệnh cập nhật trong tài liệu (tải zip nhánh rồi giải nén đè) sẽ xóa sạch mọi sửa đổi hôm nay. Cần <code>git init</code> rồi đẩy lên nhánh của bạn; tôi làm phần lệnh, bạn đăng nhập GitHub.</p></div></label></div>
+
+<div class="card"><label class="prop"><input type="checkbox" data-id="B2" checked>
+<div><h3><span class="id">B2</span> Tách nến khỏi <code>cohort.jsonl</code> <span class="chip rec">nên làm trước khi lên VPS</span></h3>
+<p>File 50 MB bị ghi lại toàn bộ khoảng 3 lần mỗi 5 phút và tăng 10 MB mỗi ngày; nến chiếm 85% dung lượng. Sau một tháng là hàng trăm GB ghi đĩa mỗi ngày. Đề xuất: nến ghi nối đuôi vào file riêng (hoặc SQLite, có sẵn trong Python), <code>cohort.jsonl</code> chỉ giữ dòng ghi nhận.</p>
+<p class="kv"><b>Công sức:</b> vừa, có bước chuyển đổi dữ liệu cũ. <b>Rủi ro:</b> đụng vào bộ thu thập đang chạy, cần làm cẩn thận kèm sao lưu.</p></div></label></div>
+
+<div class="card"><label class="prop"><input type="checkbox" data-id="B3" checked>
+<div><h3><span class="id">B3</span> Giảm sót pool ở bộ thu thập <span class="chip">sau B2</span></h3>
+<p>200 pool mới nhất chỉ phủ 4–8 phút, trong khi bước điền nến chặn bước ghi nhận tới 5 phút (19/27 lần chạy gần nhất có cảnh báo). Sót ngẫu nhiên nên không làm lệch kết quả, nhưng làm mất dữ liệu. Sau B2 có thể chạy hai vòng độc lập.</p></div></label></div>
+
+<div class="card"><label class="prop"><input type="checkbox" data-id="B4" checked>
+<div><h3><span class="id">B4</span> Giảm credit Helius mỗi pool <span class="chip rec">nên làm</span></h3>
+<ul>
+<li><b>Bỏ lệnh <code>getAsset</code> (10 credit)</b> chỉ dùng để đọc quyền mint/freeze: RPC công khai đọc được miễn phí.</li>
+<li><b>Dừng ở trang 2 khi đếm holder:</b> 297/512 pool cần 2–3 trang (20–30 credit), và đó chính là các dàn ví. Biết "≥1.000 holder" là đủ để loại.</li>
+</ul></div></label></div>
+
+<div class="card"><label class="prop"><input type="checkbox" data-id="B5">
+<div><h3><span class="id">B5</span> Các điểm nhỏ <span class="chip">ưu tiên thấp</span></h3>
+<ul>
+<li>Bot đọc dự trữ bằng 2 lệnh RPC mỗi vị thế mỗi 15 giây; gộp được thành 1.</li>
+<li><code>/sellall</code> khi RPC lỗi sẽ ghi lệnh thành −100%.</li>
+<li><code>collect.get()</code> không phân biệt "không có dữ liệu" với "API lỗi" (chưa gây hậu quả: 0 pool bị ảnh hưởng).</li>
+<li><code>healthcheck</code> đếm mọi tiến trình python.exe thay vì đúng tiến trình của dự án.</li>
+<li>Biến môi trường mất khi máy khởi động lại; cần Task Scheduler hoặc chuyển VPS.</li>
+</ul></div></label></div>
+
+<h3>C. Dọn dẹp những thứ không còn cần</h3>
+
+<div class="card"><label class="prop"><input type="checkbox" data-id="C1" checked>
+<div><h3><span class="id">C1</span> Xóa bản thử nghiệm đầu tiên <span class="chip rec">nên làm</span></h3>
+<p>10 file không được bot hay bộ thu thập dùng: <code>anomaly.py</code>, <code>backtest.py</code>, <code>broker.py</code>, <code>engine.py</code>, <code>strategy.py</code>, <code>synthetic.py</code>, <code>live.py</code>, <code>realtest.py</code>, <code>models.py</code>, <code>config.py</code> (ở gốc <code>memebot/</code>), cùng <code>tests/test_memebot.py</code> và phần README mô tả chúng. Chúng trùng tên với module của bot (<code>strategy.py</code>, <code>config.py</code>) nên dễ sửa nhầm.</p></div></label></div>
+
+<div class="card"><label class="prop"><input type="checkbox" data-id="C2" checked>
+<div><h3><span class="id">C2</span> Xóa file không liên quan và tài liệu trùng <span class="chip rec">nên làm</span></h3>
+<ul>
+<li><code>App.js</code>, <code>package.json</code>, <code>README.md</code> ở gốc: ứng dụng LifeHub cũ, không liên quan.</li>
+<li>Hai file <code>code.zip</code>.</li>
+<li><code>memebot/PROMPT_CLAUDE_CODE.md</code>: trùng nội dung <code>CLAUDE.md</code> và còn ghi con số +3% đã sai.</li>
+</ul></div></label></div>
+
+<div class="card"><label class="prop"><input type="checkbox" data-id="C3" checked>
+<div><h3><span class="id">C3</span> Xóa các nhánh code chết trong file đang dùng <span class="chip">nên làm</span></h3>
+<ul>
+<li><code>helius.py --enrich</code>: ghi đè <code>cohort.jsonl</code> không an toàn trong lúc bộ thu thập đang chạy.</li>
+<li><code>collect.py --source top</code>: nguồn thiên lệch, chính tài liệu cũng cảnh báo không dùng.</li>
+<li>Chế độ "mua đuổi" (<code>chase</code>): chưa từng bật, chưa từng backtest.</li>
+</ul></div></label></div>
+
+<h3>D. Cấu hình Claude và chi phí token</h3>
+
+<div class="card"><label class="prop"><input type="checkbox" data-id="D1">
+<div><h3><span class="id">D1</span> Tắt các skill không liên quan cho dự án này <span class="chip">bạn tự làm trong app</span></h3>
+<p>Dự án không có <code>AGENTS.md</code> hay skill riêng, và <code>CLAUDE.md</code> gọn (dưới 3 KB), phần này ổn. Nhưng mỗi phiên đang nạp mô tả của khoảng 100 skill cấp tài khoản không dùng tới ở đây (sàng lọc cổ phiếu Mỹ, cổ tức, Bizfly, CRM/ERP, slide...). Chúng tốn context ở mọi lượt. Tôi không tự tắt được; bạn tắt trong phần cài đặt plugin/skill của ứng dụng.</p></div></label></div>
+
+<div class="card"><label class="prop"><input type="checkbox" data-id="D2">
+<div><h3><span class="id">D2</span> Rút gọn <code>PROJECT.md</code> <span class="chip">tùy chọn</span></h3>
+<p>File đã 20 KB và phải đọc lại mỗi lần tiếp quản. Đề xuất tách phần lịch sử kết quả sang <code>RESULTS.md</code>, để <code>PROJECT.md</code> chỉ còn kiến trúc, cách chạy và trạng thái hiện tại.</p></div></label></div>
+
+<div class="card"><label class="prop"><input type="checkbox" data-id="D3">
+<div><h3><span class="id">D3</span> Tạo một skill đánh giá hằng tuần <span class="chip">tùy chọn</span></h3>
+<p>Một lệnh chạy <code>entry_timing --grid</code>, <code>rc_rules</code>, <code>review</code>, <code>healthcheck</code> rồi tóm tắt bằng tiếng Việt, thay vì mỗi tuần phải giải thích lại.</p></div></label></div>
+
+<h2>4. Nói thẳng về mục tiêu "có lãi thật"</h2>
+<div class="card">
+<ul>
+<li><b>Hiện tại chưa đạt mốc nào</b> trong ba mốc ở PROJECT.md mục 7, và khoảng cách còn xa: ngoài mẫu đang là −28% mỗi lệnh.</li>
+<li><b>Chưa có bằng chứng rằng lợi thế tồn tại</b> với dữ liệu công khai và độ trễ hiện có. Bộ lọc tốt nhất mới đưa về −4%. Có thể mô hình chọn token (A4) vượt được 0, cũng có thể không; tôi không hứa được.</li>
+<li><b>Mô phỏng vẫn lạc quan hơn thực tế</b> ở chỗ chưa tính trượt giá do cạnh tranh, giao dịch thất bại, MEV và phí ưu tiên khi thị trường nóng.</li>
+<li><b>Thứ tự hợp lý:</b> B1 (giữ code) → A1 + A2 + A3 (đo lại trên paper với phép đo đúng) → A4 + A5 (mô hình chọn token) → A6 (đối chiếu báo giá thật) → chỉ khi cả ba mốc đạt mới bàn tới tiền thật.</li>
+<li><b>Điểm dừng đã ghi trong tài liệu vẫn nên giữ:</b> nếu sau 2–3 tuần nữa khoảng tin cậy vẫn chứa 0 hoặc paper âm, dừng ở mức công cụ nghiên cứu.</li>
+</ul>
+</div>
+
+<h2>5. Cách tự kiểm tra các sửa đổi</h2>
+<div class="card">
+<p>Trong Command Prompt, tại thư mục dự án:</p>
+<ul>
+<li><code>python -m unittest discover -s memebot/tests -t .</code> → phải thấy <code>Ran 80 tests</code> và <code>OK</code>.</li>
+<li><code>python -m memebot.healthcheck</code> → có dòng <code>WARN bot paper balance 0.0016 SOL ... opens NO new positions</code>.</li>
+<li><code>python -m memebot.ml.entry_timing --data cohort.jsonl --grid --stake 0.2 --max-h1 0.8</code> → dòng <code>NEW bot rules</code> khoảng −28%.</li>
+<li><code>python -m memebot.ml.rc_rules --data cohort.jsonl --stake 0.2 --max-h1 0.8</code> → phần holder có các dòng <code>KEEP</code>, dòng <code>bot: top10 &gt;50%</code> ghi <code>no</code>.</li>
+</ul>
+</div>
+</main>
+
+<div class="bar"><div>
+<button id="copy">Sao chép lựa chọn</button>
+<button class="ghost" id="all">Chọn tất cả</button>
+<span id="out"></span>
+</div></div>
+
+<script>
+const boxes = [...document.querySelectorAll('input[data-id]')];
+const out = document.getElementById('out');
+function summary(){
+  const yes = boxes.filter(b => b.checked).map(b => b.dataset.id);
+  const no = boxes.filter(b => !b.checked).map(b => b.dataset.id);
+  return 'Duyệt: ' + (yes.join(', ') || 'không mục nào') + '. Chưa duyệt: ' + (no.join(', ') || 'không mục nào') + '.';
+}
+function show(){ out.textContent = summary(); }
+boxes.forEach(b => b.addEventListener('change', show));
+document.getElementById('all').addEventListener('click', () => { boxes.forEach(b => b.checked = true); show(); });
+document.getElementById('copy').addEventListener('click', async () => {
+  const text = summary();
+  try { await navigator.clipboard.writeText(text); out.textContent = 'Đã sao chép: ' + text; }
+  catch (e) { out.textContent = 'Không sao chép tự động được, hãy chép dòng này: ' + text; }
+});
+show();
+</script>
+</body>
+</html>

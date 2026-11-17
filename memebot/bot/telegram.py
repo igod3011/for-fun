@@ -18,6 +18,7 @@ HELP = ("/status - balance, PnL, open positions\n"
         "/pause - stop opening new positions (exits still managed)\n"
         "/resume - allow new positions again\n"
         "/sellall - close every open position now\n"
+        "/topup 5 - add 5 paper SOL to the balance (P&L unchanged)\n"
         "/stop - close everything and shut the bot down\n"
         "/help - this list")
 
