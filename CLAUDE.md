@@ -46,7 +46,7 @@ kill criterion and the number of variants tried, never as an ad-hoc script. The 
 `ml/wallet_scores.py` · `bot/runner.py` (uses `strategy.py`, `paper.py`, `intel.py`, `telegram.py`, `config.py`).
 
 ## Project tracking (Notion)
-The user follows progress in Notion page "MemeRadar: Quản lý dự án"
+The user follows progress in Notion page "Pelluca: Quản lý dự án"
 (https://app.notion.com/p/41b5b058739681c687ced7b24c9279da). After every completed task or meaningful update,
 update Notion in the same turn (Vietnamese text):
 - Tasks `collection://41b5b058-7396-8117-8cd7-000b8bbbb6d1`: set "Trạng thái" (Chưa làm/Đang làm/Bị chặn/Xong) and
