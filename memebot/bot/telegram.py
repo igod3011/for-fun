@@ -43,7 +43,11 @@ class Telegram:
     def send(self, text, html=False):
         if not self.chat_id:
             return
-        params = {"chat_id": self.chat_id, "text": text[:4000], "disable_web_page_preview": True}
+        self.send_to(self.chat_id, text, html)
+
+    def send_to(self, chat_id, text, html=False):
+        """Send to any chat (the public Pelluca bot answers everyone; the paper bot only its owner)."""
+        params = {"chat_id": chat_id, "text": text[:4000], "disable_web_page_preview": True}
         if html:
             params["parse_mode"] = "HTML"
         self._transport("sendMessage", params)

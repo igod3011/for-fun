@@ -44,6 +44,10 @@ kill criterion and the number of variants tried, never as an ad-hoc script. The 
 `collector_daemon.py` → `collect.py` → `store.py` (`cohort.jsonl`, `cohort.fills.jsonl`, `cohort.snaps.jsonl`) · `report.py` ·
 `healthcheck.py` · `quote_check.py` · `ml/entry_timing.py` · `ml/rc_rules.py` · `ml/select_model.py` ·
 `ml/wallet_scores.py` · `bot/runner.py` (uses `strategy.py`, `paper.py`, `intel.py`, `telegram.py`, `config.py`).
+Pelluca (public, read-only product bot, English): `pelluca/bot.py` (/check, /watch; env `PELLUCA_BOT_TOKEN`) ·
+`pelluca/check.py` · `pelluca/chain.py` (PumpSwap layout, getProgramAccounts by mint/creator) · `pelluca/watch.py` ·
+`pelluca/drain_eval.py` · deploy in `pelluca/deploy/`. Paid product data: chain + DexScreener only (no RugCheck,
+no GeckoTerminal keyless: their terms do not cover it).
 
 ## Project tracking (Notion)
 The user follows progress in Notion page "Pelluca: Quản lý dự án"
