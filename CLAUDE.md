@@ -36,8 +36,9 @@ kill criterion and the number of variants tried, never as an ad-hoc script. The 
   (`memebot\restart_collector.bat`, `memebot\start_bot.bat`) in a window that has the env vars.
 - The folder is a git checkout of `igod3011/for-fun`, branch `claude/mql5-market-product-5p7wht`. The user's
   Command Prompt has no `git`; data files are gitignored.
-- User-facing messages and docs are in Vietnamese; code, comments and commit messages in English. The user works in
-  Windows Command Prompt: give one copyable command at a time, with how to check it worked.
+- User-facing messages and docs are in Vietnamese; code, comments and commit messages in English. The user now works
+  on a MacBook (Terminal: `python3`, `export VAR=...`; the old Windows PC holds the cohort data). Give one copyable
+  command at a time, with how to check it worked. Full status + paste-ready prompt: `memebot/PROMPT_CLAUDE_CODE.md`.
 - Weekly evaluation: the `weekly-eval` skill.
 
 ## Key entry points
