@@ -22,6 +22,13 @@ cho sản phẩm thu phí, xem Notion "Tuần 1").
 - Mua 0,5 SOL rồi bán ngay mất bao nhiêu, top 10 bán hết thì rút đi bao nhiêu % SOL của pool.
 - Tỷ lệ nền từ nghiên cứu 10 ngày: 71% pool tốt nghiệp mất hơn 90% SOL trong 3 giờ.
 
+## Chạy trên macOS (Terminal)
+1. Cài Python + git (một lần): `xcode-select --install`, kiểm tra bằng `python3 --version`.
+2. Tải code: mở https://github.com/igod3011/for-fun/archive/refs/heads/claude/mql5-market-product-5p7wht.zip,
+   giải nén, rồi `cd ~/Downloads/for-fun-claude-mql5-market-product-5p7wht`.
+3. `export PELLUCA_BOT_TOKEN=token_vua_nhan` rồi `python3 -m memebot.pelluca.bot` (thấy `Pelluca bot running`).
+   Biến môi trường chỉ sống trong cửa sổ Terminal đó; đóng máy (gập nắp) là bot dừng, nên chạy 24/7 thì dùng VPS.
+
 ## Chạy trên Windows (thử)
 1. Tạo bot MỚI: Telegram → @BotFather → `/newbot` → đặt tên `Pelluca` → nhận token. Không dùng token của bot paper.
 2. Trong Command Prompt, tại thư mục dự án:
