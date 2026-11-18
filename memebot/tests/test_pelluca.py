@@ -114,6 +114,23 @@ class CheckTest(unittest.TestCase):
         self.assertTrue(0 < ex["top10_drain"] < 1)
         self.assertIsNone(check.exit_math(healthy(pool_sol=1.0)))
 
+    def test_retry_recovers_from_rate_limit(self):
+        calls, waits = [], []
+
+        def flaky():
+            calls.append(1)
+            if len(calls) < 3:
+                raise RuntimeError("public RPC getTokenLargestAccounts failed: HTTPError")
+            return [("acc", 1.0)]
+        self.assertEqual(check._retry(flaky, sleep=waits.append), [("acc", 1.0)])
+        self.assertEqual((len(calls), waits), (3, [2.0, 4.0]))
+
+    def test_retry_gives_up(self):
+        def dead():
+            raise RuntimeError("busy")
+        with self.assertRaises(RuntimeError):
+            check._retry(dead, tries=2, sleep=lambda s: None)
+
     def test_render_mentions_base_rate_and_disclaimer(self):
         text = check.render(healthy(dex={"name": "<b>X", "price_usd": 0.001, "mcap": 5000, "change_h1": 0.1}))
         self.assertIn("Not financial advice", text)

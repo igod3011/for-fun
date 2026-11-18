@@ -23,6 +23,18 @@ DEAD_SOL = 5.0            # a graduated pump.fun pool starts with ~85 SOL; under
 GRAD_SOL = 85.0           # real SOL in a PumpSwap pool right after a pump.fun graduation (cohort, 11/2026)
 STUDY = "2,890 graduated pump.fun pools tracked 6-16 Nov 2026"
 BASE_RATE = 0.71          # share of those pools left with <10% of their SOL 3 hours later (RESULTS.md)
+HOLDER_TRIES = 3          # the public RPC rate-limits getTokenLargestAccounts often; retry before giving up
+
+
+def _retry(fn, tries=HOLDER_TRIES, wait=2.0, sleep=time.sleep):
+    """fn() with a few spaced retries; re-raises the last error."""
+    for i in range(tries):
+        try:
+            return fn()
+        except Exception:
+            if i == tries - 1:
+                raise
+            sleep(wait * (i + 1))
 
 
 def dex_info(mint, get=None):
@@ -53,7 +65,7 @@ def parse_dex(d):
             "sol_usd": usd / native if native else None}
 
 
-def gather(mint, _call=rpc.call, dex=dex_info, now=None):
+def gather(mint, _call=rpc.call, dex=dex_info, now=None, _sleep=time.sleep):
     """All facts for one token. Never raises for missing optional parts; a missing pool is a fact too."""
     now = now or time.time()
     f = {"mint": mint, "checked_at": now}
@@ -77,8 +89,9 @@ def gather(mint, _call=rpc.call, dex=dex_info, now=None):
     except Exception:
         f["mint_auth"] = f["freeze_auth"] = "unknown"
     try:
-        sup = chain.supply(mint, _call=_call)
-        top = [a for a in chain.largest_accounts(mint, _call=_call) if a[0] != p["tok_acc"]]
+        sup = _retry(lambda: chain.supply(mint, _call=_call), sleep=_sleep)
+        top = [a for a in _retry(lambda: chain.largest_accounts(mint, _call=_call), sleep=_sleep)
+               if a[0] != p["tok_acc"]]
         f["supply"] = sup
         f["top1"] = top[0][1] / sup if sup and top else None
         f["top10"] = sum(a[1] for a in top[:10]) / sup if sup else None
