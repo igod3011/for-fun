@@ -196,6 +196,32 @@ class BotTest(unittest.TestCase):
             for s in ("Not financial advice", "at least 18 years old", "non-refundable", "seed phrase"):
                 self.assertIn(s, full)
 
+    def test_serve_sends_checking_note_first(self):
+        with tempfile.TemporaryDirectory() as d:
+            bot, _ = self.make(d)
+            said = []
+            bot.say = lambda chat, text, html=True: said.append(text)
+            bot.serve(5, MINT)
+            self.assertEqual(len(said), 2)
+            self.assertIn("Checking", said[0])
+            self.assertIn("NO MAJOR FLAGS", said[1])
+            said.clear()
+            bot.serve(5, "/help")                                          # fast commands: no note
+            self.assertEqual(len(said), 1)
+            self.assertFalse(bot.is_lookup("/check abc"))
+
+    def test_serve_reports_failure(self):
+        with tempfile.TemporaryDirectory() as d:
+            bot, _ = self.make(d)
+            said = []
+            bot.say = lambda chat, text, html=True: said.append(text)
+
+            def boom(mint):
+                raise RuntimeError("rpc down")
+            bot.gather = boom
+            bot.serve(5, f"/check {MINT}")
+            self.assertIn("check failed", said[-1])
+
     def test_rate_limit(self):
         with tempfile.TemporaryDirectory() as d:
             bot, _ = self.make(d)

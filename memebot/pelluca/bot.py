@@ -20,6 +20,7 @@ from .watch import DROP, MAX_PER_CHAT, WINDOW_MIN, Watches
 
 CHECKS_PER_HOUR = 20
 POLL_S = 30
+WORKERS = 4               # chats served in parallel; a /check takes 10-40 s on the free public RPC
 
 HELP = ("Pelluca checks Solana tokens before you buy.\n\n"
         "/check <CA> - risk report for a token (or just paste the address)\n"
@@ -57,7 +58,31 @@ class PellucaBot:
                 return self.say(chat, re.sub(r"<[^>]+>", "", text), html=False)
             print("telegram send failed:", e, flush=True)
 
+    def is_lookup(self, text):
+        """True when the message will trigger a slow chain lookup (/check, /watch or a bare address)."""
+        parts = text.split()
+        if not parts:
+            return False
+        if chain.is_address(parts[0]):
+            return True
+        cmd = parts[0].split("@")[0].lower()
+        return cmd in ("/check", "/watch") and len(parts) > 1 and chain.is_address(parts[1])
+
+    def serve(self, chat, text):
+        """Answer one message; slow lookups get an immediate 'checking' note first."""
+        try:
+            if self.is_lookup(text):
+                self.say(chat, "🔎 Checking on-chain data… this takes 10-40 seconds.", html=False)
+            self.say(chat, self.handle(chat, text))
+        except Exception as e:
+            print("handle failed:", type(e).__name__, e, flush=True)
+            self.say(chat, "Sorry, the check failed (network). Please try again in a minute.", html=False)
+
     def allowed(self, chat):
+        with self.lock:
+            return self._allowed(chat)
+
+    def _allowed(self, chat):
         now = self.clock()
         c = [t for t in self.calls.get(chat, []) if now - t < 3600]
         if len(c) >= CHECKS_PER_HOUR:
@@ -116,14 +141,18 @@ class PellucaBot:
         return len(alerts)
 
     def telegram_loop(self):
+        slots = threading.BoundedSemaphore(WORKERS)
+
+        def run(chat, text):
+            try:
+                self.serve(chat, text)
+            finally:
+                slots.release()
         while True:
             try:
                 for chat, text in self.tg.poll():
-                    try:
-                        self.say(chat, self.handle(chat, text))
-                    except Exception as e:
-                        print("handle failed:", type(e).__name__, e, flush=True)
-                        self.say(chat, "Sorry, the check failed (network). Please try again in a minute.", html=False)
+                    slots.acquire()                     # at most WORKERS lookups at once; others wait their turn
+                    threading.Thread(target=run, args=(chat, text), daemon=True).start()
             except Exception as e:
                 print("telegram poll failed:", e, flush=True)
                 time.sleep(5)
