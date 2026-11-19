@@ -85,7 +85,11 @@ def gather(mint, _call=rpc.call, dex=dex_info, now=None, _sleep=time.sleep):
         j_dex = ex.submit(_safe, lambda: dex(mint))
         j_auth = ex.submit(_safe, lambda: rpc.mint_authorities(mint, _call=_call), ("unknown", "unknown"))
         j_sup = ex.submit(_safe, lambda: _retry(lambda: chain.supply(mint, _call=_call), sleep=_sleep))
-        j_top = ex.submit(_safe, lambda: _retry(lambda: chain.largest_accounts(mint, _call=_call), sleep=_sleep))
+        # the free public RPC refuses getTokenLargestAccounts almost always (measured on the VPS 19/11/2026:
+        # 3 of 3 tries failed, 15 s lost); retry only when Helius can answer it
+        top_tries = HOLDER_TRIES if rpc._has_helius(None) else 1
+        j_top = ex.submit(_safe, lambda: _retry(lambda: chain.largest_accounts(mint, _call=_call), tries=top_tries,
+                                                sleep=_sleep))
         pools = j_pools.result()
         f["dex"] = j_dex.result()
         if not pools:
