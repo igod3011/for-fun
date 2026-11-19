@@ -25,7 +25,7 @@
 </div></div>
 
 <header><div class="wrap">
-<a class="brand" href="/"><img src="/static/logo.svg" alt=""><span>pelluca</span></a>
+<a class="brand" href="/"><svg class="pelly" viewBox="0 0 64 64" fill="none" aria-hidden="true"><g class="bell"><path d="M8 32C8 17 19 7 32 7s24 10 24 25c-3.6 4.4-8.4 4.4-12 0-3.6 4.4-8.4 4.4-12 0-3.6 4.4-8.4 4.4-12 0-3.6 4.4-8.4 4.4-12 0Z" fill="#C4B5FD" fill-opacity=".18" stroke="#C4B5FD" stroke-width="4.5" stroke-linejoin="round"/><circle class="eye" cx="25.5" cy="25" r="3.6" fill="#E9ECF1"/><circle class="eye" cx="38.5" cy="25" r="3.6" fill="#E9ECF1"/></g><g class="legs" stroke="#C4B5FD" stroke-width="4.5" stroke-linecap="round"><path class="l1" d="M21 37c-3 5 3 8 0 13s3 7 0 10"/><path class="l2" d="M32 37c3 5-3 8 0 13s-3 6 0 9"/><path class="l3" d="M43 37c-3 5 3 8 0 13s3 7 0 10"/></g></svg><span>pelluca</span></a>
 <nav class="main" aria-label="Main">
 <a href="#checks">Checks</a><a href="#report">Daily report</a><a href="/studio">Meme Studio</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a>
 </nav>
@@ -34,6 +34,7 @@
 
 <main>
 <section class="wrap hero" id="top">
+<div class="ambient" aria-hidden="true"><span class="glow"></span><span class="bub b1"></span><span class="bub b2"></span><span class="bub b3"></span><span class="bub b4"></span><span class="bub b5"></span></div>
 <div class="copy">
 <h1>Check the pool before you buy the coin.</h1>
 <p class="lede">Paste a Solana contract address. Pelluca reads the chain and shows whether the liquidity can be pulled, who holds the supply, and what the creator did with their last launches.</p>
@@ -60,9 +61,9 @@
 </section>
 
 <section class="numbers"><div class="wrap">
-<div class="n"><b>71%</b><span>of graduated pump.fun pools lost over 90% of their SOL within 3 hours</span></div>
-<div class="n"><b>74%</b><span>of those drains happened inside the first minute: check first, not after</span></div>
-<div class="n"><b>2,890</b><span>pools in our own study, 6–16 Nov 2026</span></div>
+<div class="n"><b data-count="71" data-suffix="%">71%</b><span>of graduated pump.fun pools lost over 90% of their SOL within 3 hours</span></div>
+<div class="n"><b data-count="74" data-suffix="%">74%</b><span>of those drains happened inside the first minute: check first, not after</span></div>
+<div class="n"><b data-count="2890">2,890</b><span>pools in our own study, 6–16 Nov 2026</span></div>
 </div></section>
 
 <section class="wrap block split" id="checks">
@@ -106,7 +107,7 @@
 </div>
 <div class="demo" aria-hidden="true">
 <div class="prompt">a frog who works night shifts at a 24h ramen shop<span class="accent">▍</span></div>
-<div class="tiles"><div class="tile"></div><div class="tile"></div><div class="tile"></div></div>
+<div class="tiles shimmer"><div class="tile"></div><div class="tile"></div><div class="tile"></div></div>
 <div class="chips"><span>$NOODLR</span><span>$RAMENFROG</span><span>$LATESHIFT</span></div>
 </div>
 </div>
@@ -166,5 +167,6 @@
 </div></footer>
 
 <script src="/static/app.js" defer></script>
+<script src="/static/motion.js" defer></script>
 </body>
 </html>

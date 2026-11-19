@@ -20,12 +20,19 @@
 
   function message(text, busy) {
     card.textContent = "";
-    var m = el("div", "msg" + (busy ? " pulse mono" : ""), text);
-    card.appendChild(m);
+    card.classList.remove("fresh");
+    card.classList.toggle("scan", !!busy);
+    card.appendChild(el("div", "msg" + (busy ? " pulse mono" : ""), text));
+    if (busy) {
+      var l = el("div", "lines"); l.appendChild(el("i")); l.appendChild(el("i")); l.appendChild(el("i"));
+      card.appendChild(l);
+    }
   }
 
   function draw(r) {
     card.textContent = "";
+    card.classList.remove("scan");
+    card.classList.remove("fresh"); void card.offsetWidth; card.classList.add("fresh");
     var bar = el("div", "bar mono");
     bar.appendChild(el("span", null, "report"));
     bar.appendChild(el("span", null, "/"));

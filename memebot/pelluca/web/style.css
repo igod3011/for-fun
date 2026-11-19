@@ -161,3 +161,79 @@ button[disabled]{opacity:.5;cursor:not-allowed}
   .verdict{margin-left:0}
   .status .opt{display:none}
 }
+
+/* ---------- motion (all of it switched off for prefers-reduced-motion) ---------- */
+.brand .pelly{width:28px;height:28px;overflow:visible}
+.pelly .bell{animation:bob 3.2s ease-in-out infinite;transform-origin:32px 24px}
+.pelly .legs path{animation:sway 2.4s ease-in-out infinite;transform-origin:32px 37px}
+.pelly .l2{animation-delay:-.8s}.pelly .l3{animation-delay:-1.6s}
+.pelly .legs{animation:bob 3.2s ease-in-out infinite}
+.pelly .eye{animation:blink 5s infinite;transform-origin:center;transform-box:fill-box}
+@keyframes bob{50%{transform:translateY(-2.5px)}}
+@keyframes sway{50%{transform:skewX(6deg)}}
+@keyframes blink{0%,92%,100%{transform:scaleY(1)}95%{transform:scaleY(.1)}}
+.brand:hover .pelly .bell{animation-duration:1s}
+
+.hero{position:relative}
+.hero>*:not(.ambient){position:relative;z-index:1}
+.ambient{position:absolute;inset:-40px 0 0;overflow:hidden;pointer-events:none;z-index:0}
+.ambient .glow{position:absolute;width:560px;height:560px;right:-120px;top:-80px;border-radius:50%;
+  background:radial-gradient(circle,rgba(196,181,253,.16) 0%,rgba(196,181,253,0) 65%);animation:drift 14s ease-in-out infinite}
+@keyframes drift{50%{transform:translate(-80px,60px) scale(1.1)}}
+.bub{position:absolute;bottom:-20px;width:8px;height:8px;border-radius:50%;border:1px solid rgba(196,181,253,.35);
+  animation:rise 12s linear infinite;opacity:0}
+.b1{left:8%;animation-delay:0s}.b2{left:30%;width:5px;height:5px;animation-delay:3s;animation-duration:15s}
+.b3{left:52%;animation-delay:6s}.b4{left:72%;width:12px;height:12px;animation-delay:1.5s;animation-duration:17s}
+.b5{left:90%;width:6px;height:6px;animation-delay:8s}
+@keyframes rise{0%{transform:translateY(0);opacity:0}10%{opacity:1}100%{transform:translateY(-640px) translateX(20px);opacity:0}}
+
+.hero .copy>*{animation:up .7s cubic-bezier(.2,.7,.2,1) both}
+.hero .copy>*:nth-child(2){animation-delay:.08s}.hero .copy>*:nth-child(3){animation-delay:.16s}
+.hero .copy>*:nth-child(4){animation-delay:.24s}
+.hero .card{animation:up .8s .2s cubic-bezier(.2,.7,.2,1) both}
+@keyframes up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+.ca button{transition:transform .15s,filter .15s}
+.ca button:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.ca button:active{transform:translateY(1px)}
+.btn{transition:filter .15s,border-color .15s,transform .15s}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost:hover{border-color:var(--accent)}
+
+.card.fresh .flags li,.card.fresh .stats div{animation:up .45s cubic-bezier(.2,.7,.2,1) both}
+.card.fresh .flags li:nth-child(1){animation-delay:.1s}.card.fresh .flags li:nth-child(2){animation-delay:.18s}
+.card.fresh .flags li:nth-child(3){animation-delay:.26s}.card.fresh .flags li:nth-child(4){animation-delay:.34s}
+.card.fresh .flags li:nth-child(5){animation-delay:.42s}.card.fresh .flags li:nth-child(n+6){animation-delay:.5s}
+.card.fresh .verdict{animation:pop .5s .1s cubic-bezier(.3,1.6,.5,1) both}
+@keyframes pop{from{opacity:0;transform:scale(.7)}}
+.scan{position:relative;overflow:hidden}
+.scan::after{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);
+  animation:scan 1.4s ease-in-out infinite}
+@keyframes scan{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+.scan .lines{display:flex;flex-direction:column;gap:10px;padding:6px 18px 24px}
+.scan .lines i{display:block;height:12px;border-radius:3px;background:linear-gradient(90deg,var(--line2),#1E2433,var(--line2));
+  background-size:200% 100%;animation:sheen 1.2s linear infinite}
+.scan .lines i:nth-child(2){width:80%}.scan .lines i:nth-child(3){width:60%}
+@keyframes sheen{to{background-position:-200% 0}}
+
+.js .reveal{opacity:0;transform:translateY(18px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+.js .reveal.in{opacity:1;transform:none}
+.rows .row{transition:background .2s,padding .2s}
+.rows .row:hover{background:linear-gradient(90deg,rgba(196,181,253,.05),transparent)}
+.price tbody tr{transition:background .2s}
+.price tbody tr:hover{background:rgba(255,255,255,.02)}
+
+.shimmer .tile{background:linear-gradient(110deg,#161226 30%,#2A2148 50%,#161226 70%),#161226;background-size:250% 100%;animation:sheen 2.6s linear infinite}
+.shimmer .tile:nth-child(2){animation-delay:.3s}.shimmer .tile:nth-child(3){animation-delay:.6s}
+.prompt .accent{animation:caret 1s steps(1) infinite}
+@keyframes caret{50%{opacity:0}}
+.chat>div{opacity:1}
+.js .chat.in>div{animation:up .5s both}.js .chat.in>div:nth-child(2){animation-delay:.6s}.js .chat.in>div:nth-child(3){animation-delay:1.4s}
+.dot{box-shadow:0 0 0 0 rgba(74,222,128,.6);animation:ping 2s infinite}
+@keyframes ping{70%{box-shadow:0 0 0 6px rgba(74,222,128,0)}100%{box-shadow:0 0 0 0 rgba(74,222,128,0)}}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .js .reveal{opacity:1;transform:none}
+  .ambient .bub{display:none}
+}
