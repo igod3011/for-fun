@@ -116,6 +116,7 @@ class CheckTest(unittest.TestCase):
 
     def test_gather_parallel_reads(self):
         from unittest import mock
+        check._cache.clear()
         pool = {"pool": "P", "sol_acc": "S", "tok_acc": "T", "virt_sol": 30.0, "coin_creator": "C",
                 "lp_mint": "L", "lp_supply": 100}
         with mock.patch.object(chain, "pools_for_mint", return_value=[dict(pool)]), \
@@ -135,6 +136,18 @@ class CheckTest(unittest.TestCase):
         self.assertEqual(f["mint_auth"], "unknown")                       # a failed read is reported, not raised
         self.assertEqual(f["history"], {"n": 1, "drained": 1, "factory": False})
         self.assertEqual(f["dex"], {"name": "X"})
+
+    def test_cached_gather_reuses_recent_report(self):
+        from unittest import mock
+        check._cache.clear()
+        clock = [1000.0]
+        with mock.patch.object(check, "gather", side_effect=lambda mint, **kw: {"mint": mint, "n": len(check._cache)}) as g:
+            a = check.cached_gather(MINT, now=lambda: clock[0])
+            b = check.cached_gather(MINT, now=lambda: clock[0] + 30)          # within CHECK_TTL: reused
+            self.assertIs(a, b)
+            check.cached_gather(MINT, now=lambda: clock[0] + check.CHECK_TTL + 1)
+            self.assertEqual(g.call_count, 2)
+        check._cache.clear()
 
     def test_retry_recovers_from_rate_limit(self):
         calls, waits = [], []

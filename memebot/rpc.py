@@ -32,11 +32,33 @@ def public_rpc(method, params, tries=2, pace=0.15):
     raise RuntimeError(f"public RPC {method} failed: {type(last).__name__}")
 
 
-def call(method, params, _public=public_rpc, _helius=None):
+# Peak routing: while the free public RPC is rate-limiting us (it failed in the last BUSY_S seconds), calls go to
+# Helius first, so users do not wait through public retries. Quiet periods stay on the free RPC (0 credits).
+# Methods the public RPC throttles hardest go to Helius first whenever a key is set.
+BUSY_S = 60
+HELIUS_FIRST = {"getTokenLargestAccounts"}
+ROUTE = {"busy_until": 0.0}
+USAGE["helius_peak"] = 0
+
+
+def _has_helius(_helius):
+    return _helius is not None or bool(os.environ.get("HELIUS_API_KEY"))
+
+
+def call(method, params, _public=public_rpc, _helius=None, _now=time.time):
+    if _has_helius(_helius) and (method in HELIUS_FIRST or _now() < ROUTE["busy_until"]):
+        if _helius is None:
+            from .helius import rpc as _helius
+        try:
+            USAGE["helius_peak"] += 1
+            return _helius(method, params, pace=0.05)
+        except RuntimeError:
+            pass                                          # Helius failed too: try the public RPC once
     try:
         return _public(method, params)
     except RuntimeError:
-        if not os.environ.get("HELIUS_API_KEY") and _helius is None:
+        ROUTE["busy_until"] = _now() + BUSY_S
+        if not _has_helius(_helius):
             raise
         if _helius is None:
             from .helius import rpc as _helius

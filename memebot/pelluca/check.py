@@ -11,6 +11,7 @@ what happened to pools like this one; they are not a prediction and never a reco
 """
 import json
 import sys
+import threading
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -121,7 +122,42 @@ def gather(mint, _call=rpc.call, dex=dex_info, now=None, _sleep=time.sleep):
     return f
 
 
+CHECK_TTL = 60            # seconds a full report is reused: most users check the same trending tokens
+HISTORY_TTL = 3600        # a creator's launch history changes slowly
+_cache = {}               # key -> (expires_at, value)
+_cache_lock = threading.Lock()
+
+
+def _cached(key, ttl, fn, now=time.time):
+    with _cache_lock:
+        hit = _cache.get(key)
+        if hit and hit[0] > now():
+            return hit[1]
+    value = fn()
+    if value is None:                                     # a failed read is retried next time, never cached
+        return value
+    with _cache_lock:
+        if len(_cache) > 5000:                            # keep memory bounded on a 1 GB VPS
+            t = now()
+            for k in [k for k, (exp, _) in _cache.items() if exp <= t]:
+                del _cache[k]
+            if len(_cache) > 5000:
+                _cache.clear()
+        _cache[key] = (now() + ttl, value)
+    return value
+
+
+def cached_gather(mint, now=time.time, **kw):
+    """gather() reused for CHECK_TTL seconds per token (the bot's entry point)."""
+    return _cached(("check", mint), CHECK_TTL, lambda: gather(mint, **kw), now=now)
+
+
 def creator_history(creator, this_pool, limit=200, _call=rpc.call):
+    return _cached(("history", creator, this_pool), HISTORY_TTL,
+                   lambda: _creator_history(creator, this_pool, limit, _call))
+
+
+def _creator_history(creator, this_pool, limit=200, _call=rpc.call):
     """Other graduated launches of the same creator and how many are drained now (replaces RugCheck's
     'creator history of rugged tokens', from chain data only)."""
     try:
@@ -247,8 +283,35 @@ def render(f, html=True):
 
 def main():
     if len(sys.argv) < 2 or not chain.is_address(sys.argv[1]):
-        sys.exit("usage: python -m memebot.pelluca.check <token contract address>")
-    print(render(gather(sys.argv[1]), html=False))
+        sys.exit("usage: python -m memebot.pelluca.check <token contract address> [--timing]")
+    if "--timing" not in sys.argv:
+        print(render(gather(sys.argv[1]), html=False))
+        return
+    log, lock = [], threading.Lock()                     # where does a check spend its time?
+
+    def timed_call(method, params):
+        t = time.time()
+        ok = "ok"
+        try:
+            return rpc.call(method, params)
+        except Exception as e:
+            ok = type(e).__name__
+            raise
+        finally:
+            with lock:
+                log.append((time.time() - t, method, ok))
+
+    def timed_dex(mint):
+        t = time.time()
+        out = dex_info(mint)
+        log.append((time.time() - t, "DexScreener", "ok" if out else "none"))
+        return out
+    t0 = time.time()
+    gather(sys.argv[1], _call=timed_call, dex=timed_dex)
+    print(f"total {time.time() - t0:.1f} s   (Helius configured: {'yes' if rpc._has_helius(None) else 'no'})")
+    for sec, what, ok in sorted(log, reverse=True):
+        print(f"  {sec:5.1f} s  {what}  {ok}")
+    print("route:", rpc.USAGE)
 
 
 if __name__ == "__main__":

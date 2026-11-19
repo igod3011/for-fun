@@ -10,6 +10,36 @@ def acct(amount):
 
 
 class RpcFallbackTest(unittest.TestCase):
+    def setUp(self):
+        rpc.ROUTE["busy_until"] = 0.0
+
+    def test_peak_routing(self):
+        calls = []
+        pub_ok = lambda m, p: calls.append("public") or "pub"
+        hel = lambda m, p, pace: calls.append("helius") or "hel"
+
+        def broken(m, p):
+            raise RuntimeError("429")
+        self.assertEqual(rpc.call("getAccountInfo", [], _public=pub_ok, _helius=hel, _now=lambda: 100.0), "pub")
+        self.assertEqual(rpc.call("getAccountInfo", [], _public=broken, _helius=hel, _now=lambda: 100.0), "hel")
+        calls.clear()                                    # public is now "busy" for BUSY_S: Helius first
+        self.assertEqual(rpc.call("getAccountInfo", [], _public=pub_ok, _helius=hel, _now=lambda: 130.0), "hel")
+        self.assertEqual(calls, ["helius"])
+        calls.clear()                                    # quiet again: back to the free RPC
+        self.assertEqual(rpc.call("getAccountInfo", [], _public=pub_ok, _helius=hel, _now=lambda: 200.0), "pub")
+        self.assertEqual(calls, ["public"])
+        calls.clear()                                    # heavily throttled method: Helius first
+        self.assertEqual(rpc.call("getTokenLargestAccounts", [], _public=pub_ok, _helius=hel), "hel")
+        self.assertEqual(calls, ["helius"])
+
+    def test_no_key_stays_public(self):
+        def broken(m, p):
+            raise RuntimeError("429")
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("HELIUS_API_KEY", None)
+            with self.assertRaises(RuntimeError):
+                rpc.call("getTokenLargestAccounts", [], _public=broken)
+
     def test_public_first_helius_only_on_failure(self):
         calls = []
         ok = lambda m, p: calls.append("public") or {"value": [acct(85)]}

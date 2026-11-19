@@ -44,7 +44,7 @@ TERMS = ("<b>Pelluca terms, in short</b>\n"
 
 
 class PellucaBot:
-    def __init__(self, tg, watches, gather=check.gather, balances=chain.token_balances, clock=time.time):
+    def __init__(self, tg, watches, gather=check.cached_gather, balances=chain.token_balances, clock=time.time):
         self.tg, self.w, self.gather, self.balances, self.clock = tg, watches, gather, balances, clock
         self.calls = {}                      # chat -> [timestamps of checks]
         self.lock = threading.Lock()
