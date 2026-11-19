@@ -142,7 +142,7 @@ class WatchTest(unittest.TestCase):
         h = [(0, 80.0), (60, 78.0), (120, 50.0)]
         self.assertTrue(drain_alert(h, 120)[0])                        # -37% within 10 min
         self.assertFalse(drain_alert([(0, 80.0), (60, 70.0)], 60)[0])  # -12.5%
-        self.assertFalse(drain_alert([(0, 80.0), (1200, 50.0)], 1200)[0])   # slow bleed outside the window
+        self.assertFalse(drain_alert([(0, 80.0), (2400, 50.0)], 2400)[0])   # slow bleed outside the window
         self.assertTrue(drain_alert([(0, 4.0)], 0)[0])
 
     def test_watches_alert_once_then_rearm(self):

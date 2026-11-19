@@ -10,8 +10,12 @@ import json
 import os
 import time
 
-DROP = 0.30
-WINDOW_MIN = 10
+# Measured 19/11/2026 (drain_eval, 2,519 pools, thresholds chosen on the first 60%, reported on the last 40%):
+# 20%/30 min caught 50% of dead pools while they still held >= half their SOL (90% CI 47-54%), 10% false alarms.
+# The previous 30%/10 min caught 38% on the same test pools. 74% of dead pools lose over half their SOL within one
+# minute, so no polling rule can warn about most rugs in time; /check before buying matters more.
+DROP = 0.20
+WINDOW_MIN = 30
 DEAD_SOL = 5.0
 MAX_PER_CHAT = 10
 

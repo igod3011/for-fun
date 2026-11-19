@@ -2,6 +2,18 @@
 
 Mới nhất ở trên. Mọi con số là lợi nhuận thực rút được từ pool, sau phí. "TEST" = 40% pool mới nhất, không dùng để chọn.
 
+## 19/11/2026: đo cảnh báo rút thanh khoản của Pelluca /watch (`pelluca/drain_eval.py`)
+Dữ liệu: 2.519 pool chuẩn có nến, xếp theo thời gian; chọn ngưỡng trên 1.511 pool đầu (60%), báo kết quả trên 1.008
+pool sau (40%). "Báo kịp" = cảnh báo khi pool còn ≥ 50% SOL lúc bắt đầu theo dõi; "báo nhầm" = cảnh báo vào pool
+sau ≥ 3 giờ còn ≥ 50% SOL. Mốc "báo mọi pool": báo nhầm 19%.
+- Chọn 20% trong 30 phút: TEST báo kịp 50% của 582 pool mất trắng (CI 90% 47%..54%), 864 cảnh báo, báo nhầm 10%.
+  Ngưỡng cũ 30% trong 10 phút trên cùng pool TEST: báo kịp 38%, báo nhầm 7%. Đã đổi bot sang 20%/30 phút.
+- KPI Cổng 1 (báo kịp ≥ 60%, báo nhầm ≤ 20%): CHƯA ĐẠT, và có giới hạn trần: 74% pool mất trắng rơi từ ≥ 80% xuống
+  dưới 50% SOL trong MỘT phút (một lệnh xả lớn hoặc rút LP); trung vị 12 phút sau khi bắt đầu theo dõi, 45% trong
+  10 phút đầu. Cảnh báo theo dõi định kỳ không thể báo trước những ca này; 48% ca mất trắng chỉ được báo khi đã muộn.
+- Hệ quả: giá trị chính của Pelluca là /check TRƯỚC khi mua; /watch là lớp phụ. Hạn chế: nến 1 phút (bot thật đọc
+  30 giây/lần), mốc thời gian bắt đầu theo dõi giả định lúc ghi nhận pool.
+
 ## 16/11/2026: dừng thu thập, tổng kết 10 ngày dữ liệu
 Bot và bộ thu thập dừng lúc 09:12 ngày 16/11 theo yêu cầu. Dữ liệu: 06/11 10:57 đến 16/11 09:03, 23.116 pool, trong đó
 2.943 pool chuẩn pump.fun (2.890 đã có kết quả) và 944 pool tự nhiên. Hai khoảng trống: 09/11 19:54 (14,1 giờ) và

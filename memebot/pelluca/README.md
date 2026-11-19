@@ -7,7 +7,8 @@ cho sản phẩm thu phí, xem Notion "Tuần 1").
 
 ## Lệnh trong Telegram
 - `/check <CA>` hoặc dán thẳng địa chỉ token: báo cáo rủi ro.
-- `/watch <CA>`: báo khi SOL trong pool giảm 30% trong 10 phút hoặc còn dưới 5 SOL.
+- `/watch <CA>`: báo khi SOL trong pool giảm 20% trong 30 phút hoặc còn dưới 5 SOL (ngưỡng đo 19/11/2026, xem
+  `memebot/RESULTS.md`).
 - `/unwatch <CA>`, `/list`, `/terms` (tóm tắt điều khoản + link pelluca.com/terms), `/help`.
 - Điều khoản dịch vụ đầy đủ (tiếng Anh): `memebot/pelluca/legal/TERMS.md`. Viết theo mẫu pump.fun và GMGN
   (luật BVI, trọng tài BVI IAC, bỏ quyền kiện tập thể, trần trách nhiệm 100 USD). Cần tạo email support@pelluca.com.

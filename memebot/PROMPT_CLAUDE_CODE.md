@@ -24,7 +24,8 @@ B. Pelluca (sản phẩm, đang làm): công cụ kiểm tra rủi ro token cho 
    - Bot Telegram công khai: memebot/pelluca/bot.py (env PELLUCA_BOT_TOKEN, bot mới từ @BotFather).
      /check <CA>: LP đã đốt chưa, pool cạn, mất bao nhiêu so với ~85 SOL lúc tốt nghiệp, quyền mint/freeze,
      top holder, ví tạo token còn giữ bao nhiêu, lịch sử ví tạo token (pool khác cùng ví đã cạn chưa), chi phí
-     mua-bán ngay. /watch <CA>: báo khi SOL pool giảm 30% trong 10 phút hoặc < 5 SOL (ngưỡng tạm, chưa đo).
+     mua-bán ngay. /watch <CA>: báo khi SOL pool giảm 20% trong 30 phút hoặc < 5 SOL (đã đo 19/11/2026: báo kịp 50%
+     ca mất trắng, CI 47-54%, báo nhầm 10%; KPI 60% chưa đạt, xem RESULTS.md).
    - Dữ liệu cho sản phẩm thu phí: CHỈ chuỗi Solana (memebot/rpc.py: RPC công khai trước, Helius dự phòng) và
      DexScreener (điều khoản cho phép thương mại, ghi nguồn). KHÔNG RugCheck, KHÔNG GeckoTerminal không key.
    - Thanh toán: khách trả SOL vào một ví Phantom MỚI chỉ để nhận tiền. Code chỉ đọc giao dịch đến (pay.py, Tuần 4),
