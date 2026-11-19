@@ -1,20 +1,32 @@
 # Pelluca Terms of Service
 
-_Last updated: 19 November 2026 · Version 1.1_
+_Last updated: 19 November 2026 · Version 1.2_
 
-These Terms of Service ("Terms") govern your use of Pelluca: the website at pelluca.com, the Pelluca Telegram bot,
-and any related tools, reports and content (together, the "Service"). These Terms are an agreement between you and
-Pelluca ("Pelluca", "we", "us"). By accessing or using the Service in any way you agree to these Terms. If you do
-not agree, do not use the Service.
+Pelluca takes its name from *pellucid*: clear enough to see through. Our job is to make the risks of a token visible
+before you touch it, using only data anyone can verify.
+
+These Pelluca Terms of Service ("Terms") are an agreement between you and Pelluca ("Pelluca", "we", "us"). They
+govern your use of every Pelluca product listed in Section 1 (together, the "Pelluca Services" or the "Service"). By
+accessing or using any Pelluca Service you agree to these Terms. If you do not agree, do not use Pelluca.
 
 **PELLUCA IS NOT A BROKER, EXCHANGE, FINANCIAL INSTITUTION, ADVISOR OR CUSTODIAN. IT CANNOT MOVE OR ACCESS YOUR
 FUNDS. MOST NEW TOKENS LOSE ALMOST ALL OF THEIR VALUE. YOU MAY LOSE ALL OF THE MONEY YOU PUT INTO ANY TOKEN, WHATEVER
 PELLUCA SAYS ABOUT IT.**
 
-## 1. What Pelluca is
+## 1. The Pelluca Services
 
-Pelluca is a **read-only information tool**. It reads public blockchain data and public market data and turns it
-into risk reports and alerts about crypto tokens, starting with tokens on Solana.
+Pelluca is a **read-only token risk checker**. It reads public blockchain data and public market data and turns it
+into risk reports and alerts about crypto tokens, starting with tokens on Solana. The Pelluca Services are:
+
+- **pelluca.com**: the Pelluca website, including its token check box and the Pelluca Daily Report.
+- **Pelluca Bot**: the official Pelluca Telegram bot, linked from pelluca.com. Only the bot linked there is ours.
+- **Pelluca Check** (`/check`): a risk report for one token address: whether the pool's LP tokens are burnt, how
+  much SOL is left in the pool, mint and freeze authority, top-holder and creator holdings, the creator wallet's
+  history of earlier launches, and the cost of buying and selling right away.
+- **Pelluca Watch** (`/watch`): alerts when a watched token's pool loses liquidity quickly.
+- **Pelluca Daily Report**: a daily summary of the Solana new-token market.
+- **Pelluca Meme Studio**: generated names, stories and images for meme projects (Section 6).
+- **Pelluca Pro** and other paid plans (Section 7).
 
 Pelluca does **not**:
 - buy, sell, swap or hold any token or currency for you;
@@ -68,16 +80,18 @@ You agree not to:
 
 We set usage limits (for example, a number of checks per hour and tokens watched per person) and may change them.
 
-## 6. Generated content (Meme Studio)
+## 6. Pelluca Meme Studio
 
-Where the Service offers content generation (names, stories, images for meme projects), you are responsible for how
+Pelluca Meme Studio generates names, stories and images for meme projects. You are responsible for how
 you use the output. You must not use it to impersonate real people, brands or existing projects, to deceive buyers,
 or to infringe anyone's rights. We filter requests that appear to impersonate others and may refuse any request.
-Generating content does not create, launch or list a token, and Pelluca does not launch tokens.
+Generating content does not create, launch or list a token, Pelluca does not launch tokens, and you must not describe
+a token as made, checked or approved by Pelluca because you used Meme Studio.
 
 ## 7. Paid plans and payments
 
-Some features require a paid plan. Prices are shown before you pay. Payment is made in SOL to the receiving wallet
+Some features require a paid plan, such as Pelluca Pro or a Meme Studio pack. Current prices are shown on pelluca.com
+and in the Pelluca Bot before you pay. Payment is made in SOL to the receiving wallet
 address shown on your invoice. Each invoice has an exact amount and expires after a set time (currently 30 minutes).
 
 - **Pay the exact amount, to the exact address, before the invoice expires.** Blockchain transfers cannot be
@@ -159,5 +173,5 @@ rise to it first arose, or it is permanently barred, to the extent the law allow
 
 ## 17. Contact
 
-Questions, data deletion requests, dispute notices and reports of impersonation: support@pelluca.com or the Pelluca
-Telegram bot.
+Questions, data deletion requests, dispute notices and reports of fake Pelluca bots or accounts: support@pelluca.com
+or the official Pelluca Bot linked from pelluca.com.
