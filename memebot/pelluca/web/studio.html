@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meme Studio · Pelluca</title>
+<meta name="description" content="Generate names, stories and images for meme ideas. Blocks impersonation. Does not launch tokens.">
+<meta property="og:title" content="Pelluca: check the pool before you buy the coin">
+<meta property="og:description" content="Read-only Solana token risk checks from on-chain data.">
+<meta property="og:image" content="https://pelluca.com/static/pelly-640.png">
+<meta name="theme-color" content="#0A0C12">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header><div class="wrap">
+<a class="brand" href="/"><img src="/static/logo.svg" alt=""><span>pelluca</span></a>
+<nav class="main" aria-label="Main">
+<a href="/#checks">Checks</a><a href="/#report">Daily report</a><a href="/studio">Meme Studio</a><a href="/#pricing">Pricing</a><a href="/#faq">FAQ</a>
+</nav>
+<a class="btn ghost small" href="https://t.me/PellucaCheckBot" rel="noopener">Telegram bot ↗</a>
+</div></header>
+<main>
+<div class="wrap studio">
+<form onsubmit="return false">
+<div style="display:flex;flex-direction:column;gap:6px">
+<span class="badge">COMING SOON</span>
+<h1 style="font-size:28px;letter-spacing:-.03em">Meme Studio</h1>
+<p class="sub" style="font-size:14px">Describe a character or a joke. Pelluca makes name options, a short story and images you can post.</p>
+</div>
+<label>Your idea<textarea rows="4" placeholder="a frog who works night shifts at a 24h ramen shop" disabled></textarea></label>
+<div style="display:flex;flex-direction:column;gap:8px;font-size:14px;color:var(--soft)">Tone<div class="chips"><span class="on">Wholesome</span><span>Absurd</span><span>Dark humour</span><span>Hype</span></div></div>
+<div style="display:flex;flex-direction:column;gap:8px;font-size:14px;color:var(--soft)">Image style<div class="chips"><span>Pixel</span><span class="on">Sticker</span><span>3D toy</span><span>Hand-drawn</span></div></div>
+<button class="btn primary" type="button" disabled>Generate · 1 credit</button>
+<p class="fine mono" style="line-height:1.6">Blocked: real people, brands, existing coins and their logos. Output is yours to use. Pelluca does not launch, list or endorse tokens. <a href="/terms#6-pelluca-meme-studio" style="color:var(--muted)">Terms §6</a></p>
+</form>
+<section class="out" aria-label="Example output">
+<div class="mono" style="font-size:12px;color:var(--muted)">What a result will look like</div>
+<div class="box"><p>NAMES</p><div class="chips" style="padding:16px 18px;font-size:15px"><span>Noodlr · $NOODLR</span><span>Ramen Frog · $RAMENFROG</span><span>Late Shift · $LATESHIFT</span></div></div>
+<div class="box"><p>STORY</p><p style="margin:0;padding:16px 18px;color:var(--soft)">Who the character is, one running joke, and one line people can repeat.</p></div>
+<div class="tiles" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))"><div class="tile"></div><div class="tile"></div><div class="tile"></div><div class="tile"></div></div>
+<div class="note"><span class="mono" style="color:var(--amber);font-size:12px;padding-top:2px">NOTE</span><span>Before anyone buys a coin with this art, they can paste its address into Pelluca. The report shows whether LP is burnt and authorities are revoked, whatever art the coin uses.</span></div>
+<p class="sub" style="font-size:14px">Want to know when it opens? <a href="https://t.me/PellucaCheckBot" rel="noopener" class="accent">Follow @PellucaCheckBot</a>.</p>
+</section>
+</div>
+</main>
+<footer><div class="wrap">
+<div class="about"><span class="wordmark">pelluca</span><span>Clear enough to see through.</span><span class="mono" style="font-size:12px">© 2026 Pelluca · Not financial advice · 18+</span></div>
+<div class="col"><span class="mono" style="font-size:12px;color:var(--dim)">PRODUCT</span><a href="/#checks">Checks</a><a href="/#report">Daily report</a><a href="/studio">Meme Studio</a><a href="https://t.me/PellucaCheckBot" rel="noopener">Telegram bot</a></div>
+<div class="col"><span class="mono" style="font-size:12px;color:var(--dim)">LEGAL</span><a href="/terms">Terms of Service</a><a href="/#faq">FAQ</a><a href="mailto:support@pelluca.com">support@pelluca.com</a></div>
+</div></footer>
+</body>
+</html>

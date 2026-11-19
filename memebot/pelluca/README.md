@@ -12,7 +12,8 @@ cho sản phẩm thu phí, xem Notion "Tuần 1").
 - `/unwatch <CA>`, `/list`, `/terms` (tóm tắt điều khoản + link pelluca.com/terms), `/help`.
 - Điều khoản dịch vụ đầy đủ (tiếng Anh): `memebot/pelluca/legal/TERMS.md`. Viết theo mẫu pump.fun và GMGN
   (luật BVI, trọng tài BVI IAC, bỏ quyền kiện tập thể, trần trách nhiệm 100 USD). Cần tạo email support@pelluca.com.
-- Giới hạn: 20 lần kiểm tra mỗi giờ, 10 token theo dõi mỗi người.
+- Giới hạn gói Free (`limits.py`, duyệt 19/11/2026): 20 lần kiểm tra mỗi giờ và 100 mỗi ngày, 3 token theo dõi.
+  Gói Pro (khi có `pay.py`): 300 lần/ngày, 25 token.
 
 ## Báo cáo /check gồm
 - Pool có thật là pool tốt nghiệp pump.fun không (dự trữ ảo), **token LP đã đốt chưa** (chưa đốt = có thể rút
@@ -55,3 +56,10 @@ Chọn ngưỡng trên 60% pool đầu, báo kết quả trên 40% pool sau. G�
 
 ## Chạy trên VPS (Ubuntu, Vultr Singapore 5 USD)
 Xem `memebot/pelluca/deploy/VPS.md`.
+
+## Website pelluca.com (`web.py`, thư mục `web/`)
+- `python -m memebot.pelluca.web` chạy ở 127.0.0.1:8080; Caddy phía trước lo HTTPS (`deploy/Caddyfile`, VPS.md mục 8).
+- Trang: `/` (ô dán CA gọi `/api/check`, cùng logic với bot), `/studio` (Meme Studio, đang "coming soon"),
+  `/terms` (dựng từ `legal/TERMS.md` mỗi lần mở, nên sửa điều khoản chỉ cần sửa file đó).
+- Giới hạn theo IP giống gói Free. Không lưu IP vào log. Chỉ thư viện chuẩn Python.
+- Logo "Pelly" (sứa trong suốt): `web/logo.svg`, `web/favicon.svg`, ảnh đại diện `web/pelly-640.png`.

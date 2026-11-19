@@ -52,11 +52,34 @@ cd /home/pelluca/app && set -a && . /home/pelluca/pelluca.env && set +a && pytho
 
 ## 6. Cập nhật code sau này
 ```
-sudo -u pelluca git -C /home/pelluca/app pull && systemctl restart pelluca-bot
+sudo -u pelluca git -C /home/pelluca/app pull && systemctl restart pelluca-bot pelluca-web
 ```
+(Chưa cài website thì bỏ `pelluca-web`.)
 
 ## 7. Bảo mật tối thiểu
 ```
 ufw allow OpenSSH && ufw --force enable
 ```
-Bot chỉ gọi ra ngoài (Telegram, RPC), không mở cổng nào, nên không cần mở thêm.
+Bot chỉ gọi ra ngoài (Telegram, RPC), không mở cổng nào. Website mở thêm cổng 80 và 443 (mục 8).
+
+## 8. Website pelluca.com (cùng VPS)
+Cần có tên miền trước. Trong trang quản lý tên miền, tạo 2 bản ghi A: `@` và `www` trỏ về IP của VPS. Chờ vài
+phút rồi kiểm tra trên máy mình: `ping pelluca.com` phải ra đúng IP VPS.
+
+Chạy website (Python chuẩn, chỉ nghe ở 127.0.0.1:8080):
+```
+cp /home/pelluca/app/memebot/pelluca/deploy/pelluca-web.service /etc/systemd/system/ && systemctl daemon-reload && systemctl enable --now pelluca-web
+```
+Kiểm tra: `curl -s 127.0.0.1:8080 | head -3` phải ra `<!doctype html>`.
+
+Caddy lo HTTPS (tự xin và gia hạn chứng chỉ):
+```
+apt -y install caddy
+```
+```
+cp /home/pelluca/app/memebot/pelluca/deploy/Caddyfile /etc/caddy/Caddyfile && systemctl reload caddy
+```
+```
+ufw allow 80 && ufw allow 443
+```
+Kiểm tra: mở https://pelluca.com trên trình duyệt, dán một CA và bấm Check.

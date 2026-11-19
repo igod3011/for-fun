@@ -6,7 +6,7 @@ import unittest
 from memebot.bot.telegram import Telegram
 from memebot.pelluca import chain, check, drain_eval
 from memebot.pelluca.bot import CHECKS_PER_HOUR, PellucaBot
-from memebot.pelluca.watch import Watches, drain_alert
+from memebot.pelluca.watch import MAX_PER_CHAT, Watches, drain_alert
 
 MINT = "2cMcMEX3Eqo86tUrVe5dgHp5GZNwqQ6crqm22UeZpump"
 CREATOR = "JBMCwSKt2Zt3jL9zKaQtbk3HHB15jYrmGZLhUaEMMQGn"
@@ -194,9 +194,9 @@ class WatchTest(unittest.TestCase):
     def test_watch_limit(self):
         with tempfile.TemporaryDirectory() as d:
             w = Watches(os.path.join(d, "w.json"))
-            for i in range(10):
+            for i in range(MAX_PER_CHAT):
                 self.assertTrue(w.add(1, f"M{i}", "P", f"Q{i}", "X"))
-            self.assertFalse(w.add(1, "M10", "P", "Q10", "X"))
+            self.assertFalse(w.add(1, "Mx", "P", "Qx", "X"))
 
 
 class BotTest(unittest.TestCase):

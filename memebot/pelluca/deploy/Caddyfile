@@ -1,0 +1,9 @@
+# /etc/caddy/Caddyfile : HTTPS for pelluca.com (Caddy gets and renews the certificate by itself)
+pelluca.com {
+	encode gzip
+	reverse_proxy 127.0.0.1:8080
+}
+
+www.pelluca.com {
+	redir https://pelluca.com{uri} permanent
+}

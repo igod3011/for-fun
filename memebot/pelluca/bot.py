@@ -4,7 +4,7 @@
   python -m memebot.pelluca.bot        # run forever
   python -m memebot.pelluca.bot --once # answer pending messages + one watch pass, then exit (smoke test)
 
-Limits per chat: CHECKS_PER_HOUR checks, watch.MAX_PER_CHAT watched tokens. Watched pools are read every
+Limits per chat (limits.py): CHECKS_PER_HOUR and CHECKS_PER_DAY checks, watch.MAX_PER_CHAT watched tokens. Watched pools are read every
 POLL_S seconds with one getMultipleAccounts call per 100 pools (free public RPC).
 """
 import os
@@ -16,9 +16,11 @@ from html import escape
 
 from ..bot.telegram import Telegram
 from . import chain, check
+from .limits import FREE_PER_DAY, FREE_PER_HOUR, RateLimit
 from .watch import DROP, MAX_PER_CHAT, WINDOW_MIN, Watches
 
-CHECKS_PER_HOUR = 20
+CHECKS_PER_HOUR = FREE_PER_HOUR
+CHECKS_PER_DAY = FREE_PER_DAY
 POLL_S = 30
 WORKERS = 4               # chats served in parallel; a /check takes 10-40 s on the free public RPC
 
@@ -46,7 +48,7 @@ TERMS = ("<b>Pelluca terms, in short</b>\n"
 class PellucaBot:
     def __init__(self, tg, watches, gather=check.cached_gather, balances=chain.token_balances, clock=time.time):
         self.tg, self.w, self.gather, self.balances, self.clock = tg, watches, gather, balances, clock
-        self.calls = {}                      # chat -> [timestamps of checks]
+        self.limit = RateLimit(CHECKS_PER_HOUR, CHECKS_PER_DAY, clock=clock)
         self.lock = threading.Lock()
 
     def say(self, chat, text, html=True):
@@ -79,17 +81,8 @@ class PellucaBot:
             self.say(chat, "Sorry, the check failed (network). Please try again in a minute.", html=False)
 
     def allowed(self, chat):
-        with self.lock:
-            return self._allowed(chat)
-
-    def _allowed(self, chat):
-        now = self.clock()
-        c = [t for t in self.calls.get(chat, []) if now - t < 3600]
-        if len(c) >= CHECKS_PER_HOUR:
-            self.calls[chat] = c
-            return False
-        self.calls[chat] = c + [now]
-        return True
+        """None if the chat may run a check now, else 'hour' or 'day' (the limit it hit)."""
+        return self.limit.take(chat)
 
     def handle(self, chat, text):
         """Returns the reply (HTML) for one message."""
@@ -112,8 +105,11 @@ class PellucaBot:
         if cmd == "/unwatch":
             return "Stopped watching." if self.w.remove(chat, arg) else "You were not watching that token."
         if cmd in ("/check", "/watch"):
-            if not self.allowed(chat):
+            hit = self.allowed(chat)
+            if hit == "hour":
                 return f"Limit reached ({CHECKS_PER_HOUR} checks per hour). Try again later."
+            if hit == "day":
+                return f"Daily limit reached ({CHECKS_PER_DAY} checks per day). Try again tomorrow."
             f = self.gather(arg)
             report = check.render(f)
             if cmd == "/check":

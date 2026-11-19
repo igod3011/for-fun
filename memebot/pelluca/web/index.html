@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pelluca: Solana token risk checker</title>
+<meta name="description" content="Paste a Solana token address and see in seconds whether the liquidity can be pulled, who holds the supply and what the creator did before. Read-only, no wallet connect.">
+<meta property="og:title" content="Pelluca: check the pool before you buy the coin">
+<meta property="og:description" content="Read-only Solana token risk checks from on-chain data.">
+<meta property="og:image" content="https://pelluca.com/static/pelly-640.png">
+<meta name="theme-color" content="#0A0C12">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="status mono"><div class="wrap">
+<span><span class="dot"></span>Solana mainnet · live</span>
+<span>Median check 1.8 s</span>
+<span class="opt">2,890 pools in our study</span>
+<span class="right">Read-only · never asks for keys</span>
+</div></div>
+
+<header><div class="wrap">
+<a class="brand" href="/"><img src="/static/logo.svg" alt=""><span>pelluca</span></a>
+<nav class="main" aria-label="Main">
+<a href="#checks">Checks</a><a href="#report">Daily report</a><a href="/studio">Meme Studio</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a>
+</nav>
+<a class="btn ghost small" href="https://t.me/PellucaCheckBot" rel="noopener">Telegram bot ↗</a>
+</div></header>
+
+<main>
+<section class="wrap hero" id="top">
+<div class="copy">
+<h1>Check the pool before you buy the coin.</h1>
+<p class="lede">Paste a Solana contract address. Pelluca reads the chain and shows whether the liquidity can be pulled, who holds the supply, and what the creator did with their last launches.</p>
+<form class="ca" id="checkform" action="/" method="get" autocomplete="off">
+<label for="ca" class="sr">Token contract address</label>
+<span class="tag mono">CA</span>
+<input id="ca" name="ca" type="text" placeholder="Paste address…pump" spellcheck="false" required maxlength="44">
+<button class="btn primary" type="submit">Check</button>
+</form>
+<p class="fine mono">Free: 20 checks an hour, no sign-up · Not financial advice · 18+</p>
+</div>
+
+<div class="card" id="report-card" aria-live="polite">
+<div class="bar mono"><span>report</span><span>/</span><span style="color:var(--text)">example</span><span class="when">sample, not a live token</span></div>
+<div class="title"><b>EXAMPLE</b><span class="mono" style="color:var(--muted);font-size:13px">PumpSwap</span><span class="verdict v-red">HIGH RISK</span></div>
+<div class="stats mono"><div><span>pool</span><strong>3.91 SOL</strong></div><div><span>24h</span><strong style="color:var(--red)">−94%</strong></div><div><span>mcap</span><strong>$1,960</strong></div></div>
+<ul class="flags">
+<li><span class="lv lv-red">RED</span><span>Liquidity is gone: the pool holds 3.91 SOL. You may not be able to sell.</span></li>
+<li><span class="lv lv-red">RED</span><span>The creator launched 14 other graduated tokens; 13 are now drained.</span></li>
+<li><span class="lv lv-amber">WATCH</span><span>The 10 largest holders own 58% of the supply.</span></li>
+</ul>
+<div class="foot mono">Sources: Solana RPC, DexScreener</div>
+</div>
+</section>
+
+<section class="numbers"><div class="wrap">
+<div class="n"><b>71%</b><span>of graduated pump.fun pools lost over 90% of their SOL within 3 hours</span></div>
+<div class="n"><b>74%</b><span>of those drains happened inside the first minute: check first, not after</span></div>
+<div class="n"><b>2,890</b><span>pools in our own study, 6–16 Nov 2026</span></div>
+</div></section>
+
+<section class="wrap block split" id="checks">
+<div class="head">
+<p class="eyebrow">01 — CHECKS</p>
+<h2>Six things every report reads from the chain.</h2>
+<p class="sub">No scores from a black box. Each line is a fact you can open on a block explorer.</p>
+</div>
+<div class="body rows">
+<div class="row"><span class="k">01</span><span class="t">LP tokens burnt</span><span class="d">If not, whoever holds them can pull the liquidity at any moment.</span></div>
+<div class="row"><span class="k">02</span><span class="t">SOL left in the pool</span><span class="d">Against the ~85 SOL at graduation, plus the 1-hour move.</span></div>
+<div class="row"><span class="k">03</span><span class="t">Mint and freeze authority</span><span class="d">Can anyone print more tokens or freeze your wallet.</span></div>
+<div class="row"><span class="k">04</span><span class="t">Holder concentration</span><span class="d">Top 1 and top 10 wallets, and what the creator still holds.</span></div>
+<div class="row"><span class="k">05</span><span class="t">Creator history</span><span class="d">Earlier launches from the same wallet and how they ended.</span></div>
+<div class="row"><span class="k">06</span><span class="t">Cost to get out</span><span class="d">What a 0.5 SOL round trip loses now, and what a top-10 dump would do.</span></div>
+</div>
+</section>
+
+<section class="wrap block" id="report" style="display:flex;flex-direction:column;gap:28px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p class="eyebrow">02 — DAILY REPORT</p>
+<h2>Yesterday on Solana, in one table.</h2>
+</div>
+<div class="panel soon">
+<p>Every day: how many tokens graduated, how many were drained within 3 hours, and which ones are still standing. The first report is being prepared from our own collector.</p>
+<a class="btn ghost" href="https://t.me/PellucaCheckBot" rel="noopener">Get it in Telegram ↗</a>
+</div>
+</section>
+
+<section class="wrap block" id="studio">
+<div class="studio-teaser">
+<div class="copy">
+<p class="eyebrow">03 — MEME STUDIO</p>
+<h2>Got an idea for a meme? Make it look finished.</h2>
+<p class="sub" style="color:var(--soft)">Type an idea. Get name options, a short story and images you can post. A filter blocks copies of real people, brands and existing coins.</p>
+<p class="fine mono" style="color:var(--muted)">Does not launch, list or endorse any token.</p>
+<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:6px">
+<a class="btn primary" href="/studio">Open Meme Studio</a>
+<span class="mono" style="color:var(--muted);font-size:13px">3 free tries · then $5 / 50</span>
+</div>
+</div>
+<div class="demo" aria-hidden="true">
+<div class="prompt">a frog who works night shifts at a 24h ramen shop<span class="accent">▍</span></div>
+<div class="tiles"><div class="tile"></div><div class="tile"></div><div class="tile"></div></div>
+<div class="chips"><span>$NOODLR</span><span>$RAMENFROG</span><span>$LATESHIFT</span></div>
+</div>
+</div>
+</section>
+
+<section class="wrap block split" id="alerts" style="align-items:center">
+<div class="head" style="gap:14px">
+<p class="eyebrow">04 — TELEGRAM</p>
+<h2>Same checks, inside the chat you already trade from.</h2>
+<p class="sub" style="color:var(--soft)"><span class="mono accent">/check</span> any address. <span class="mono accent">/watch</span> a token and get a message if its pool loses 20% of its SOL within 30 minutes.</p>
+<p class="sub" style="font-size:14px">Honest number: on our data, alerts arrived in time for about half of the pools that went to zero. Many drain inside a minute, faster than any alert can reach you.</p>
+<a class="btn ghost" style="align-self:flex-start" href="https://t.me/PellucaCheckBot" rel="noopener">Open @PellucaCheckBot ↗</a>
+</div>
+<div class="chat" aria-hidden="true">
+<div class="me">/watch 2cMc…pump</div>
+<div class="bot">👁 Watching. I will alert you if the pool loses 20% of its SOL within 30 min.</div>
+<div class="bot alert">🚨 <b>EXAMPLE</b>: pool fell from 61.2 to 38.0 SOL (−38%) in 6 min. Check it now: /check</div>
+</div>
+</section>
+
+<section class="wrap block" id="pricing" style="display:flex;flex-direction:column;gap:28px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<p class="eyebrow">05 — PRICING</p>
+<h2>Pay in SOL. Nothing renews by itself.</h2>
+</div>
+<div class="panel price">
+<table>
+<thead><tr><th></th><th><b>Free</b><strong>$0</strong></th><th class="pro"><b class="accent">Pro</b><strong>$9</strong> <small>/ 30 days</small></th><th><b>Meme pack</b><strong>$5</strong> <small>/ 50</small></th></tr></thead>
+<tbody>
+<tr><td>Checks</td><td>20 / hour, 100 / day</td><td class="pro">300 / day</td><td>—</td></tr>
+<tr><td>Tokens watched</td><td>3</td><td class="pro">25</td><td>—</td></tr>
+<tr><td>Alert speed</td><td>every 30 s</td><td class="pro">every 10 s</td><td>—</td></tr>
+<tr><td>Meme Studio</td><td>3 tries</td><td class="pro">3 tries</td><td>50 generations</td></tr>
+<tr><td></td><td>No sign-up</td><td class="pro"><a class="btn primary small" href="https://t.me/PellucaCheckBot?start=pro" rel="noopener">Get Pro</a></td><td><a class="btn ghost small" href="/studio">Buy pack</a></td></tr>
+</tbody>
+</table>
+</div>
+<p class="fine mono">Paid plans open soon. Payment goes to the address on your invoice only; Pelluca never asks you to send SOL anywhere else.</p>
+</section>
+
+<section class="wrap block split" id="faq">
+<div class="head"><p class="eyebrow">06 — FAQ</p><h2>Questions</h2></div>
+<div class="body">
+<details><summary>Is this financial advice?</summary><p>No. Pelluca shows on-chain facts and our own base rates. "No major flags found" does not mean safe.</p></details>
+<details><summary>Do I need to connect a wallet?</summary><p>Never. Pelluca is read-only. Anyone asking for your seed phrase in our name is a scammer.</p></details>
+<details><summary>Where does the data come from?</summary><p>The Solana blockchain and DexScreener. Every number can be checked on a block explorer.</p></details>
+<details><summary>Which tokens are covered?</summary><p>Solana tokens trading on PumpSwap, which covers pump.fun graduations. More venues later.</p></details>
+<details><summary>Do I need an account?</summary><p>No. Your Telegram account is your Pelluca account. Paid plans are linked to it.</p></details>
+</div>
+</section>
+</main>
+
+<footer><div class="wrap">
+<div class="about"><span class="wordmark">pelluca</span><span>Clear enough to see through.</span><span class="mono" style="font-size:12px">© 2026 Pelluca · Not financial advice · 18+</span></div>
+<div class="col"><span class="mono" style="font-size:12px;color:var(--dim)">PRODUCT</span><a href="#checks">Checks</a><a href="#report">Daily report</a><a href="/studio">Meme Studio</a><a href="https://t.me/PellucaCheckBot" rel="noopener">Telegram bot</a></div>
+<div class="col"><span class="mono" style="font-size:12px;color:var(--dim)">LEGAL</span><a href="/terms">Terms of Service</a><a href="#faq">FAQ</a><a href="mailto:support@pelluca.com">support@pelluca.com</a></div>
+</div></footer>
+
+<script src="/static/app.js" defer></script>
+</body>
+</html>

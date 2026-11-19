@@ -49,7 +49,7 @@ kill criterion and the number of variants tried, never as an ad-hoc script. The 
 `ml/wallet_scores.py` · `bot/runner.py` (uses `strategy.py`, `paper.py`, `intel.py`, `telegram.py`, `config.py`).
 Pelluca (public, read-only product bot, English): `pelluca/bot.py` (/check, /watch; env `PELLUCA_BOT_TOKEN`) ·
 `pelluca/check.py` · `pelluca/chain.py` (PumpSwap layout, getProgramAccounts by mint/creator) · `pelluca/watch.py` ·
-`pelluca/drain_eval.py` · deploy in `pelluca/deploy/`. Paid product data: chain + DexScreener only (no RugCheck,
+`pelluca/drain_eval.py` · `pelluca/web.py` (pelluca.com: static `pelluca/web/` + `/api/check`, limits in `pelluca/limits.py`) · deploy in `pelluca/deploy/`. Paid product data: chain + DexScreener only (no RugCheck,
 no GeckoTerminal keyless: their terms do not cover it).
 
 ## Project tracking (Notion)

@@ -17,7 +17,7 @@ import time
 DROP = 0.20
 WINDOW_MIN = 30
 DEAD_SOL = 5.0
-MAX_PER_CHAT = 10
+MAX_PER_CHAT = 3          # Free plan (limits.FREE_WATCH); Pro gets limits.PRO_WATCH once pay.py exists
 
 
 def drain_alert(hist, now, drop=DROP, window_min=WINDOW_MIN, dead=DEAD_SOL):
