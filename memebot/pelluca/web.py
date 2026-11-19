@@ -43,7 +43,7 @@ def report_json(f):
     dx = f.get("dex") or {}
     out = {"mint": f["mint"], "verdict": verdict, "name": dx.get("name"),
            "price_usd": dx.get("price_usd"), "mcap": check.market_cap(f)[0], "mcap_source": check.market_cap(f)[1], "change_h1": dx.get("change_h1"),
-           "change_h24": dx.get("change_h24"), "pool": f.get("pool"), "pool_sol": f.get("pool_sol"),
+           "change_h24": dx.get("change_h24"), "pool": f.get("pool"), "pool_sol": f.get("pool_sol"), "venue": dx.get("top_dex") if check.trades_elsewhere(f) else ("pumpswap" if f.get("pool") else None), "liq_usd": dx.get("top_liq_usd") if check.trades_elsewhere(f) else None,
            "top10": f.get("top10"), "dev_pct": f.get("dev_pct"),
            "flags": [{"level": lvl, "text": txt} for lvl, txt in flags],
            "base_rate": check.BASE_RATE, "study": check.STUDY, "checked_at": f.get("checked_at")}

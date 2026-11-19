@@ -136,7 +136,9 @@ def gather(mint, _call=rpc.call, dex=dex_raw, now=None, _sleep=time.sleep):
         for p in read:
             p["sol"], p["tok"] = bal[p["sol_acc"]], bal.get(p["tok_acc"], 0.0)
         p = max(read, key=lambda x: x["sol"])
-        f["dex"] = parse(p["pool"])
+        # quote our pool's own pair only when it really holds liquidity; an empty PumpSwap pool next to a coin
+        # that trades on Meteora gave a stale $17.7M market cap instead of ~$12.7M (19/11/2026)
+        f["dex"] = parse(p["pool"] if p["sol"] >= DEAD_SOL else None)
         f.update(pool=p["pool"], pool_sol=p["sol"], pool_tok=p["tok"], virt=p["virt_sol"], creator=p["coin_creator"],
                  n_pools=len(pools), tok_acc=p["tok_acc"], sol_acc=p["sol_acc"])
         # share of the pool's LP tokens still in existence (0 = all burnt)
@@ -226,7 +228,7 @@ def assess(f):
         return flags, "UNKNOWN"
     sol = f.get("pool_sol")
     dx = f.get("dex") or {}
-    elsewhere = dx.get("top_pair") and dx["top_pair"] != f["pool"] and (dx.get("top_liq_usd") or 0) >= 1000
+    elsewhere = trades_elsewhere(f)
     if sol is None:
         add("info", "The pool's balance could not be read right now (RPC busy); try again in a minute.")
     elif sol < DEAD_SOL and elsewhere:
@@ -256,7 +258,7 @@ def assess(f):
         add("red", f"One wallet holds {t1:.0%} of the supply.")
     elif t10 is not None and t10 > 0.5:
         add("amber", f"The 10 largest holders own {t10:.0%} of the supply.")
-    if t10 is not None and t10 < 0.15:
+    if t10 is not None and t10 < 0.15 and not elsewhere:      # a pump.fun launch pattern, not for older coins
         add("amber", f"Supply is spread unusually thin (top 10 hold {t10:.0%}): a pattern of wallet farms and bundles.")
     dev = f.get("dev_pct")
     if dev is not None and dev > 0.03:
@@ -280,8 +282,16 @@ def assess(f):
             add("info", f"The pool is {age_min:.0f} minutes old: most collapses happen in the first 3 hours.")
     reds = sum(1 for l, _ in flags if l == "red")
     ambers = sum(1 for l, _ in flags if l == "amber")
-    verdict = "HIGH RISK" if reds else "ELEVATED RISK" if ambers >= 2 else "NO MAJOR FLAGS FOUND"
+    verdict = "HIGH RISK" if reds else "LIMITED CHECK" if elsewhere else "ELEVATED RISK" if ambers >= 2 \
+        else "NO MAJOR FLAGS FOUND"
     return flags, verdict
+
+
+def trades_elsewhere(f):
+    """Pure: our PumpSwap pool is (nearly) empty but DexScreener sees real liquidity in another pool."""
+    dx = f.get("dex") or {}
+    return bool(f.get("pool") and (f.get("pool_sol") or 0) < DEAD_SOL and dx.get("top_pair")
+                and dx["top_pair"] != f["pool"] and (dx.get("top_liq_usd") or 0) >= 1000)
 
 
 def market_cap(f):
@@ -322,7 +332,9 @@ def render(f, html=True):
         mcap = market_cap(f)[0]
         mc = f" | MC ${mcap:,.0f}" if mcap else ""
         lines.append(f"Price ${dx['price_usd']:.8g}{mc} | 1h {dx.get('change_h1', 0):+.0%} | 24h {dx.get('change_h24', 0):+.0%}")
-    if f.get("pool") and f.get("pool_sol") is not None:
+    if trades_elsewhere(f):
+        lines.append(f"Main liquidity: ~${dx['top_liq_usd']:,.0f} on {dx.get('top_dex') or 'another DEX'}")
+    elif f.get("pool") and f.get("pool_sol") is not None:
         lines.append(f"Pool: {f['pool_sol']:.1f} SOL" + (f" (~${f['pool_sol'] * dx['sol_usd']:,.0f})" if dx.get("sol_usd") else ""))
     facts = []
     if f.get("top10") is not None:

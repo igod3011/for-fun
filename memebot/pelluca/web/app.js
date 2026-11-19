@@ -39,7 +39,8 @@
 
     var title = el("div", "title");
     title.appendChild(el("b", null, r.name || "Token"));
-    if (r.pool) title.appendChild(el("span", "mono", "PumpSwap"));
+    var VENUES = { pumpswap: "PumpSwap", meteora: "Meteora", raydium: "Raydium", orca: "Orca", pumpfun: "pump.fun curve" };
+    if (r.venue) title.appendChild(el("span", "mono", VENUES[r.venue] || r.venue));
     var cls = { "HIGH RISK": "v-red", "ELEVATED RISK": "v-amber", "NO MAJOR FLAGS FOUND": "v-green" }[r.verdict] || "v-grey";
     title.appendChild(el("span", "verdict " + cls, r.verdict));
     card.appendChild(title);
@@ -50,7 +51,8 @@
       var s = el("strong", null, value); if (color) s.style.color = color;
       d.appendChild(s); stats.appendChild(d);
     }
-    if (r.pool_sol != null) stat("pool", r.pool_sol.toFixed(2) + " SOL");
+    if (r.liq_usd) stat("liquidity", money(r.liq_usd));
+    else if (r.pool_sol != null) stat("pool", r.pool_sol.toFixed(2) + " SOL");
     if (r.change_h24 != null) stat("24h", signed(r.change_h24), r.change_h24 <= -0.5 ? "var(--red)" : null);
     if (r.mcap) stat(r.mcap_source === "chain" ? "mcap (on-chain)" : "mcap", money(r.mcap));
     if (r.top10 != null) stat("top 10", pct(r.top10));

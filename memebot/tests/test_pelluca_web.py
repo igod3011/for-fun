@@ -177,3 +177,39 @@ class MarketCapTest(unittest.TestCase):
         from memebot.pelluca import check
         self.assertEqual(check.market_cap(facts(supply=None, dex={"sol_usd": 150.0, "mcap": 5000.0})), (5000.0, "dex"))
         self.assertEqual(check.market_cap(facts(pool_sol=None, supply=1e9, dex={"mcap": 1.0})), (1.0, "dex"))
+
+
+class DctyRegressionTest(unittest.TestCase):
+    """Real DexScreener pairs of 9hjB...pump on 19/11/2026 (from check.py --debug on the VPS)."""
+    WSOL = "So11111111111111111111111111111111111111112"
+
+    def raw(self):
+        def pr(addr, dex, quote, liq, mcap, price):
+            return {"chainId": "solana", "pairAddress": addr, "dexId": dex, "priceUsd": price, "priceNative": "0.0002",
+                    "baseToken": {"address": MINT, "symbol": "DCTY"}, "quoteToken": {"address": quote},
+                    "liquidity": {"usd": liq}, "marketCap": mcap, "priceChange": {"h24": 10}}
+        return {"pairs": [pr("DChX", "pumpswap", "TTWOmint", 487724.46, 13022266, "0.0137"),
+                          pr("3gUa", "meteora", self.WSOL, 412546.14, 12730365, "0.01346"),
+                          pr("D9Yy", "pumpswap", self.WSOL, 0, 17732250, "0.01875"),
+                          pr("6Mpq", "meteora", "MMmint", 15287270.47, 132042015971, "139.6")]}
+
+    def test_empty_own_pool_quotes_main_pair(self):
+        from unittest import mock
+        from memebot.pelluca import chain, check
+        pool = {"pool": "D9Yy", "sol_acc": "S", "tok_acc": "T", "virt_sol": None, "coin_creator": None,
+                "lp_mint": "L", "lp_supply": 100}
+        with mock.patch.object(chain, "pools_for_mint", return_value=[dict(pool)]), \
+             mock.patch.object(chain, "token_balances", return_value={"S": 3.4e-6, "T": 0.0002}), \
+             mock.patch.object(chain, "supply_raw", return_value=0), \
+             mock.patch.object(chain, "supply", return_value=945631721.98), \
+             mock.patch.object(chain, "largest_accounts", return_value=[("A", 1.7e7)] + [("B", 1.27e7)] * 9), \
+             mock.patch.object(check.rpc, "mint_authorities", return_value=(None, None)):
+            f = check.gather(MINT, _call=lambda *a: None, dex=lambda m: self.raw(), now=1.0, _sleep=lambda s: None)
+        self.assertEqual(f["dex"]["pair"], "3gUa")
+        self.assertEqual(check.market_cap(f), (12730365, "dex"))
+        r = web.report_json(f)
+        self.assertEqual((r["venue"], r["liq_usd"]), ("meteora", 412546.14))
+        flags, verdict = check.assess(f)
+        self.assertNotIn("Liquidity is gone", " ".join(t for _, t in flags))
+        self.assertEqual(verdict, "LIMITED CHECK")            # the Meteora pool's LP is not checked: say so
+        self.assertIn("Main liquidity: ~$412,546 on meteora", check.render(f, html=False))
