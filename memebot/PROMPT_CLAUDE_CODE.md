@@ -4,8 +4,8 @@ Mở Claude Code tại thư mục gốc của dự án (thư mục chứa `memeb
 Claude Code tự đọc `CLAUDE.md`; prompt này bổ sung bối cảnh, trạng thái và việc tiếp theo.
 
 ```
-Bạn tiếp quản dự án của tôi. Repo igod3011/for-fun, nhánh claude/mql5-market-product-5p7wht. Tôi dùng MacBook
-(Terminal: python3, export BIEN=...). Trả lời tôi bằng tiếng Việt; code, comment, commit bằng tiếng Anh.
+Bạn tiếp quản dự án của tôi. Repo igod3011/for-fun, nhánh claude/mql5-market-product-5p7wht. Tôi dùng máy Windows (Command Prompt) và đôi khi MacBook
+(Windows: python, set BIEN=...; Mac: python3, export BIEN=...). Trả lời tôi bằng tiếng Việt; code, comment, commit bằng tiếng Anh.
 
 VIỆC ĐẦU TIÊN
 1. Đọc CLAUDE.md (quy tắc bắt buộc), memebot/PROMPT_CLAUDE_CODE.md (file này: trạng thái đầy đủ),
