@@ -156,7 +156,7 @@ def gather(mint, _call=rpc.call, dex=dex_raw, now=None, _sleep=time.sleep):
             f["top10"] = sum(a[1] for a in top[:10]) / sup if sup else None
             f["top10_tokens"] = sum(a[1] for a in top[:10])
         else:
-            f["supply"] = None
+            f["supply"] = sup                            # still needed for the market cap
         if j_dev:
             dev = j_dev.result()
             f["dev_pct"] = dev / f["supply"] if dev is not None and f.get("supply") else None
@@ -284,6 +284,17 @@ def assess(f):
     return flags, verdict
 
 
+def market_cap(f):
+    """Pure (unit-tested): (USD market cap, source). From our own pool's reserves when we can read them:
+    price = (real SOL + virtual SOL) / tokens, times the supply read on-chain, times SOL/USD. DexScreener's figure
+    is only the fallback: it can come from a different or stale pair (19/11/2026: $17.7M shown vs ~$12M)."""
+    dx = f.get("dex") or {}
+    sol, tok, sup, usd = f.get("pool_sol"), f.get("pool_tok"), f.get("supply"), dx.get("sol_usd")
+    if sol and tok and sup and usd and sol >= DEAD_SOL:
+        return amm.price(sol, tok, f.get("virt") or 0) * sup * usd, "chain"
+    return dx.get("mcap"), "dex"
+
+
 def exit_math(f, stake=0.5):
     """Pure: what a round trip costs now, and what the top 10 holders selling would leave in the pool."""
     sol, tok, v = f.get("pool_sol") or 0, f.get("pool_tok") or 0, f.get("virt") or 0
@@ -308,7 +319,8 @@ def render(f, html=True):
     icon = {"HIGH RISK": "🔴", "ELEVATED RISK": "🟠", "NO MAJOR FLAGS FOUND": "🟢"}.get(verdict, "⚪")
     lines = [f"{icon} {b(name + ': ' + verdict)}", f"CA: {c(escape(f['mint']))}"]
     if dx.get("price_usd"):
-        mc = f" | MC ${dx['mcap']:,.0f}" if dx.get("mcap") else ""
+        mcap = market_cap(f)[0]
+        mc = f" | MC ${mcap:,.0f}" if mcap else ""
         lines.append(f"Price ${dx['price_usd']:.8g}{mc} | 1h {dx.get('change_h1', 0):+.0%} | 24h {dx.get('change_h24', 0):+.0%}")
     if f.get("pool") and f.get("pool_sol") is not None:
         lines.append(f"Pool: {f['pool_sol']:.1f} SOL" + (f" (~${f['pool_sol'] * dx['sol_usd']:,.0f})" if dx.get("sol_usd") else ""))

@@ -42,7 +42,7 @@ def report_json(f):
     flags, verdict = check.assess(f)
     dx = f.get("dex") or {}
     out = {"mint": f["mint"], "verdict": verdict, "name": dx.get("name"),
-           "price_usd": dx.get("price_usd"), "mcap": dx.get("mcap"), "change_h1": dx.get("change_h1"),
+           "price_usd": dx.get("price_usd"), "mcap": check.market_cap(f)[0], "mcap_source": check.market_cap(f)[1], "change_h1": dx.get("change_h1"),
            "change_h24": dx.get("change_h24"), "pool": f.get("pool"), "pool_sol": f.get("pool_sol"),
            "top10": f.get("top10"), "dev_pct": f.get("dev_pct"),
            "flags": [{"level": lvl, "text": txt} for lvl, txt in flags],

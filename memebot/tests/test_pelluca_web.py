@@ -161,3 +161,19 @@ class WrongPoolBugTest(unittest.TestCase):
         self.assertIn("could not be read", flags[0][1])
         check.render(f)                                      # no crash on a missing balance
         web.report_json(f)
+
+
+class MarketCapTest(unittest.TestCase):
+    def test_from_pool_reserves(self):
+        from memebot.pelluca import check
+        # (80 + 20) SOL / 2e8 tokens = 5e-7 SOL; x 1e9 supply x $150 = $75,000
+        f = facts(pool_sol=80.0, pool_tok=2e8, virt=20.0, supply=1e9, dex={"sol_usd": 150.0, "mcap": 17.7e6})
+        mcap, src = check.market_cap(f)
+        self.assertAlmostEqual(mcap, 75000.0)
+        self.assertEqual(src, "chain")
+        self.assertEqual(web.report_json(f)["mcap_source"], "chain")
+
+    def test_falls_back_to_dexscreener(self):
+        from memebot.pelluca import check
+        self.assertEqual(check.market_cap(facts(supply=None, dex={"sol_usd": 150.0, "mcap": 5000.0})), (5000.0, "dex"))
+        self.assertEqual(check.market_cap(facts(pool_sol=None, supply=1e9, dex={"mcap": 1.0})), (1.0, "dex"))

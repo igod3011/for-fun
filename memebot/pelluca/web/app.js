@@ -52,7 +52,7 @@
     }
     if (r.pool_sol != null) stat("pool", r.pool_sol.toFixed(2) + " SOL");
     if (r.change_h24 != null) stat("24h", signed(r.change_h24), r.change_h24 <= -0.5 ? "var(--red)" : null);
-    if (r.mcap) stat("mcap", money(r.mcap));
+    if (r.mcap) stat(r.mcap_source === "chain" ? "mcap (on-chain)" : "mcap", money(r.mcap));
     if (r.top10 != null) stat("top 10", pct(r.top10));
     if (stats.childNodes.length) card.appendChild(stats);
 
