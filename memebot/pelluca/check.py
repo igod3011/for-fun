@@ -13,6 +13,7 @@ import json
 import sys
 import time
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 from .. import rpc
 from ..bot import amm
@@ -23,6 +24,7 @@ DEAD_SOL = 5.0            # a graduated pump.fun pool starts with ~85 SOL; under
 GRAD_SOL = 85.0           # real SOL in a PumpSwap pool right after a pump.fun graduation (cohort, 11/2026)
 STUDY = "2,890 graduated pump.fun pools tracked 6-16 Nov 2026"
 BASE_RATE = 0.71          # share of those pools left with <10% of their SOL 3 hours later (RESULTS.md)
+PARALLEL = 6              # concurrent RPC reads per check (public RPC allows ~40 per IP)
 HOLDER_TRIES = 3          # the public RPC rate-limits getTokenLargestAccounts often; retry before giving up
 
 
@@ -65,45 +67,57 @@ def parse_dex(d):
             "sol_usd": usd / native if native else None}
 
 
+def _safe(fn, default=None):
+    try:
+        return fn()
+    except Exception:
+        return default
+
+
 def gather(mint, _call=rpc.call, dex=dex_info, now=None, _sleep=time.sleep):
-    """All facts for one token. Never raises for missing optional parts; a missing pool is a fact too."""
+    """All facts for one token. Never raises for missing optional parts; a missing pool is a fact too.
+    Independent reads run in parallel (two rounds: by mint, then by pool) so a check takes seconds, not tens."""
     now = now or time.time()
     f = {"mint": mint, "checked_at": now}
-    pools = chain.pools_for_mint(mint, _call=_call)
-    f["dex"] = dex(mint)
-    if not pools:
-        f["pool"] = None
-        return f
-    bal = chain.token_balances([x for p in pools for x in (p["sol_acc"], p["tok_acc"])], _call=_call)
-    for p in pools:
-        p["sol"], p["tok"] = bal.get(p["sol_acc"], 0.0), bal.get(p["tok_acc"], 0.0)
-    p = max(pools, key=lambda x: x["sol"])
-    f.update(pool=p["pool"], pool_sol=p["sol"], pool_tok=p["tok"], virt=p["virt_sol"], creator=p["coin_creator"],
-             n_pools=len(pools), tok_acc=p["tok_acc"], sol_acc=p["sol_acc"])
-    try:                                   # share of the pool's LP tokens still in existence (0 = all burnt)
-        f["lp_live"] = chain.supply_raw(p["lp_mint"], _call=_call) / p["lp_supply"] if p.get("lp_supply") else None
-    except Exception:
-        f["lp_live"] = None
-    try:
-        f["mint_auth"], f["freeze_auth"] = rpc.mint_authorities(mint, _call=_call)
-    except Exception:
-        f["mint_auth"] = f["freeze_auth"] = "unknown"
-    try:
-        sup = _retry(lambda: chain.supply(mint, _call=_call), sleep=_sleep)
-        top = [a for a in _retry(lambda: chain.largest_accounts(mint, _call=_call), sleep=_sleep)
-               if a[0] != p["tok_acc"]]
-        f["supply"] = sup
-        f["top1"] = top[0][1] / sup if sup and top else None
-        f["top10"] = sum(a[1] for a in top[:10]) / sup if sup else None
-        f["top10_tokens"] = sum(a[1] for a in top[:10])
-    except Exception:
-        f["supply"] = None
-    if p["coin_creator"]:
-        try:
-            f["dev_pct"] = chain.owner_balance(p["coin_creator"], mint, _call=_call) / f["supply"] if f.get("supply") else None
-        except Exception:
-            f["dev_pct"] = None
-        f["history"] = creator_history(p["coin_creator"], p["pool"], _call=_call)
+    with ThreadPoolExecutor(max_workers=PARALLEL) as ex:
+        j_pools = ex.submit(chain.pools_for_mint, mint, _call=_call)
+        j_dex = ex.submit(_safe, lambda: dex(mint))
+        j_auth = ex.submit(_safe, lambda: rpc.mint_authorities(mint, _call=_call), ("unknown", "unknown"))
+        j_sup = ex.submit(_safe, lambda: _retry(lambda: chain.supply(mint, _call=_call), sleep=_sleep))
+        j_top = ex.submit(_safe, lambda: _retry(lambda: chain.largest_accounts(mint, _call=_call), sleep=_sleep))
+        pools = j_pools.result()
+        f["dex"] = j_dex.result()
+        if not pools:
+            f["pool"] = None
+            return f
+        bal = chain.token_balances([x for p in pools for x in (p["sol_acc"], p["tok_acc"])], _call=_call)
+        for p in pools:
+            p["sol"], p["tok"] = bal.get(p["sol_acc"], 0.0), bal.get(p["tok_acc"], 0.0)
+        p = max(pools, key=lambda x: x["sol"])
+        f.update(pool=p["pool"], pool_sol=p["sol"], pool_tok=p["tok"], virt=p["virt_sol"], creator=p["coin_creator"],
+                 n_pools=len(pools), tok_acc=p["tok_acc"], sol_acc=p["sol_acc"])
+        # share of the pool's LP tokens still in existence (0 = all burnt)
+        j_lp = ex.submit(_safe, lambda: chain.supply_raw(p["lp_mint"], _call=_call) / p["lp_supply"]
+                         if p.get("lp_supply") else None)
+        j_dev = j_hist = None
+        if p["coin_creator"]:
+            j_dev = ex.submit(_safe, lambda: chain.owner_balance(p["coin_creator"], mint, _call=_call))
+            j_hist = ex.submit(creator_history, p["coin_creator"], p["pool"], _call=_call)
+        f["lp_live"] = j_lp.result()
+        f["mint_auth"], f["freeze_auth"] = j_auth.result()
+        sup, top = j_sup.result(), j_top.result()
+        if sup is not None and top is not None:
+            top = [a for a in top if a[0] != p["tok_acc"]]
+            f["supply"] = sup
+            f["top1"] = top[0][1] / sup if sup and top else None
+            f["top10"] = sum(a[1] for a in top[:10]) / sup if sup else None
+            f["top10_tokens"] = sum(a[1] for a in top[:10])
+        else:
+            f["supply"] = None
+        if j_dev:
+            dev = j_dev.result()
+            f["dev_pct"] = dev / f["supply"] if dev is not None and f.get("supply") else None
+            f["history"] = j_hist.result()
     return f
 
 

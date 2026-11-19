@@ -10,6 +10,7 @@ Because the base mint and the coin creator sit at fixed offsets, getProgramAccou
 the pool(s) of a token and every pool of a creator without any third-party API.
 """
 import base64
+from concurrent.futures import ThreadPoolExecutor
 
 from .. import rpc
 
@@ -60,8 +61,11 @@ def pools_for_mint(mint, _call=rpc.call):
     pump.fun graduations put the token as base and SOL as quote. Pools created by hand can be reversed (SOL as
     base); those are never migrations, so their virtual reserve is 0."""
     out = []
-    for side in ("base_mint", "quote_mint"):
-        for a in _gpa(OFF[side], mint, _call=_call):
+    sides = ("base_mint", "quote_mint")
+    with ThreadPoolExecutor(max_workers=2) as ex:                 # the two scans are independent: run together
+        found = list(ex.map(lambda side: _gpa(OFF[side], mint, _call=_call), sides))
+    for side, accs in zip(sides, found):
+        for a in accs:
             p = parse_pool(base64.b64decode(a["account"]["data"][0]))
             if not p:
                 continue

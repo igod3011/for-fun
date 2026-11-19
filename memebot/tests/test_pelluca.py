@@ -114,6 +114,28 @@ class CheckTest(unittest.TestCase):
         self.assertTrue(0 < ex["top10_drain"] < 1)
         self.assertIsNone(check.exit_math(healthy(pool_sol=1.0)))
 
+    def test_gather_parallel_reads(self):
+        from unittest import mock
+        pool = {"pool": "P", "sol_acc": "S", "tok_acc": "T", "virt_sol": 30.0, "coin_creator": "C",
+                "lp_mint": "L", "lp_supply": 100}
+        with mock.patch.object(chain, "pools_for_mint", return_value=[dict(pool)]), \
+             mock.patch.object(chain, "token_balances", side_effect=lambda accs, _call=None:
+                               {"S": 80.0, "T": 5e8, "S2": 1.0}), \
+             mock.patch.object(chain, "supply_raw", return_value=0), \
+             mock.patch.object(chain, "supply", return_value=1e9), \
+             mock.patch.object(chain, "largest_accounts", return_value=[("T", 5e8), ("A", 2e7), ("B", 1e7)]), \
+             mock.patch.object(chain, "owner_balance", return_value=1e7), \
+             mock.patch.object(chain, "creator_pools", return_value=[("P2", "x", "S2")]), \
+             mock.patch.object(check.rpc, "mint_authorities", side_effect=RuntimeError("busy")):
+            f = check.gather(MINT, _call=lambda *a: None, dex=lambda m: {"name": "X"}, now=1.0)
+        self.assertEqual((f["pool"], f["pool_sol"], f["lp_live"]), ("P", 80.0, 0.0))
+        self.assertAlmostEqual(f["top1"], 0.02)                            # the pool's own account is excluded
+        self.assertAlmostEqual(f["top10"], 0.03)
+        self.assertAlmostEqual(f["dev_pct"], 0.01)
+        self.assertEqual(f["mint_auth"], "unknown")                       # a failed read is reported, not raised
+        self.assertEqual(f["history"], {"n": 1, "drained": 1, "factory": False})
+        self.assertEqual(f["dex"], {"name": "X"})
+
     def test_retry_recovers_from_rate_limit(self):
         calls, waits = [], []
 
