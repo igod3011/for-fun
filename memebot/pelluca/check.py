@@ -40,32 +40,59 @@ def _retry(fn, tries=HOLDER_TRIES, wait=2.0, sleep=time.sleep):
             sleep(wait * (i + 1))
 
 
-def dex_info(mint, get=None):
-    """Price, market cap, changes and SOL/USD from DexScreener's most liquid Solana pair, or None."""
+QUOTES = {rpc.WSOL, "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"}
+MAX_MCAP = 1e10           # no memecoin pair is worth more; above this a DexScreener pair is priced against junk
+
+
+def dex_raw(mint, get=None):
+    """DexScreener's raw answer for a token, or None. Parsed later by parse_dex, once our own pool is known."""
     try:
         if get:
-            d = get(DEX.format(mint=mint))
-        else:
-            req = urllib.request.Request(DEX.format(mint=mint), headers={"User-Agent": "pelluca/0.1"})
-            with urllib.request.urlopen(req, timeout=15) as r:
-                d = json.load(r)
+            return get(DEX.format(mint=mint))
+        req = urllib.request.Request(DEX.format(mint=mint), headers={"User-Agent": "pelluca/0.1"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            return json.load(r)
     except Exception:
         return None
-    return parse_dex(d)
 
 
-def parse_dex(d):
-    """Pure (unit-tested)."""
+def dex_info(mint, get=None):
+    """Price, market cap, changes and SOL/USD from DexScreener's most liquid Solana pair, or None."""
+    return parse_dex(dex_raw(mint, get), mint=mint)
+
+
+def parse_dex(d, mint=None, pool=None):
+    """Pure (unit-tested). Picks the pair to quote: our own PumpSwap pool if DexScreener lists it, else the most
+    liquid pair that prices the token in SOL/USDC/USDT. Pairs against other tokens are skipped: anyone can create
+    a pool against a worthless token and its price makes nonsense market caps (19/11/2026: $132B on a 3-hour-old
+    coin). Also returns where the main liquidity is (dex_id, pair, liq_usd) so a check can tell a drained pool
+    from a token that simply trades elsewhere."""
     pairs = [p for p in (d or {}).get("pairs") or [] if p.get("chainId") == "solana"]
-    if not pairs:
+    if mint:
+        pairs = [p for p in pairs if (p.get("baseToken") or {}).get("address") in (None, mint)]
+    priced = [p for p in pairs if (p.get("quoteToken") or {}).get("address") in QUOTES | {None}]
+    if not priced:
         return None
-    p = max(pairs, key=lambda x: (x.get("liquidity") or {}).get("usd") or 0)
+    liq = lambda x: (x.get("liquidity") or {}).get("usd") or 0
+    own = [p for p in priced if pool and p.get("pairAddress") == pool]
+    p = own[0] if own else max(priced, key=liq)
+    top = max(priced, key=liq)
     usd, native = float(p.get("priceUsd") or 0), float(p.get("priceNative") or 0)
     ch = p.get("priceChange") or {}
-    return {"name": (p.get("baseToken") or {}).get("symbol"), "price_usd": usd, "mcap": p.get("marketCap") or p.get("fdv"),
+    mcap = p.get("marketCap") or p.get("fdv")
+    return {"name": (p.get("baseToken") or {}).get("symbol"), "price_usd": usd,
+            "mcap": mcap if mcap and mcap < MAX_MCAP else None,
             "change_h1": (ch.get("h1") or 0) / 100, "change_h24": (ch.get("h24") or 0) / 100,
             "volume_h24": (p.get("volume") or {}).get("h24"), "created_ms": p.get("pairCreatedAt"),
-            "sol_usd": usd / native if native else None}
+            "sol_usd": usd / native if native and (p.get("quoteToken") or {}).get("address") in (None, rpc.WSOL) else None,
+            "pair": p.get("pairAddress"), "dex_id": p.get("dexId"),
+            "top_pair": top.get("pairAddress"), "top_dex": top.get("dexId"), "top_liq_usd": liq(top)}
+
+
+def _all_read(bal, accs):
+    if any(a not in bal for a in accs):
+        raise RuntimeError("balances not read")
+    return bal
 
 
 def _safe(fn, default=None):
@@ -75,7 +102,7 @@ def _safe(fn, default=None):
         return default
 
 
-def gather(mint, _call=rpc.call, dex=dex_info, now=None, _sleep=time.sleep):
+def gather(mint, _call=rpc.call, dex=dex_raw, now=None, _sleep=time.sleep):
     """All facts for one token. Never raises for missing optional parts; a missing pool is a fact too.
     Independent reads run in parallel (two rounds: by mint, then by pool) so a check takes seconds, not tens."""
     now = now or time.time()
@@ -91,14 +118,25 @@ def gather(mint, _call=rpc.call, dex=dex_info, now=None, _sleep=time.sleep):
         j_top = ex.submit(_safe, lambda: _retry(lambda: chain.largest_accounts(mint, _call=_call), tries=top_tries,
                                                 sleep=_sleep))
         pools = j_pools.result()
-        f["dex"] = j_dex.result()
+        raw = j_dex.result()
+        # tests and --timing pass an already parsed dict; the real fetch returns DexScreener's raw answer
+        parse = (lambda pool: parse_dex(raw, mint=mint, pool=pool)) if isinstance(raw, dict) and "pairs" in raw \
+            else (lambda pool: raw)
         if not pools:
-            f["pool"] = None
+            f["pool"], f["dex"] = None, parse(None)
             return f
-        bal = chain.token_balances([x for p in pools for x in (p["sol_acc"], p["tok_acc"])], _call=_call)
-        for p in pools:
-            p["sol"], p["tok"] = bal.get(p["sol_acc"], 0.0), bal.get(p["tok_acc"], 0.0)
-        p = max(pools, key=lambda x: x["sol"])
+        accs = [x for p in pools for x in (p["sol_acc"], p["tok_acc"])]
+        # a failed read must never look like an empty pool (19/11/2026: "0.00 SOL, liquidity gone" on a live coin)
+        bal = _safe(lambda: _retry(lambda: _all_read(chain.token_balances(accs, _call=_call), accs), tries=2,
+                                   sleep=_sleep), {})
+        read = [p for p in pools if p["sol_acc"] in bal]
+        if not read:
+            f.update(pool=pools[0]["pool"], pool_sol=None, pool_unread=True, dex=parse(pools[0]["pool"]))
+            return f
+        for p in read:
+            p["sol"], p["tok"] = bal[p["sol_acc"]], bal.get(p["tok_acc"], 0.0)
+        p = max(read, key=lambda x: x["sol"])
+        f["dex"] = parse(p["pool"])
         f.update(pool=p["pool"], pool_sol=p["sol"], pool_tok=p["tok"], virt=p["virt_sol"], creator=p["coin_creator"],
                  n_pools=len(pools), tok_acc=p["tok_acc"], sol_acc=p["sol_acc"])
         # share of the pool's LP tokens still in existence (0 = all burnt)
@@ -152,8 +190,13 @@ def _cached(key, ttl, fn, now=time.time):
 
 
 def cached_gather(mint, now=time.time, **kw):
-    """gather() reused for CHECK_TTL seconds per token (the bot's entry point)."""
-    return _cached(("check", mint), CHECK_TTL, lambda: gather(mint, **kw), now=now)
+    """gather() reused for CHECK_TTL seconds per token (the bot's entry point). A report whose pool balance could
+    not be read is not reused."""
+    f = _cached(("check", mint), CHECK_TTL, lambda: gather(mint, **kw), now=now)
+    if f and f.get("pool_unread"):
+        with _cache_lock:
+            _cache.pop(("check", mint), None)
+    return f
 
 
 def creator_history(creator, this_pool, limit=200, _call=rpc.call):
@@ -181,10 +224,19 @@ def assess(f):
     if not f.get("pool"):
         add("red", "No PumpSwap pool found. Pelluca currently covers Solana tokens trading on PumpSwap.")
         return flags, "UNKNOWN"
-    sol = f["pool_sol"]
-    if sol < DEAD_SOL:
+    sol = f.get("pool_sol")
+    dx = f.get("dex") or {}
+    elsewhere = dx.get("top_pair") and dx["top_pair"] != f["pool"] and (dx.get("top_liq_usd") or 0) >= 1000
+    if sol is None:
+        add("info", "The pool's balance could not be read right now (RPC busy); try again in a minute.")
+    elif sol < DEAD_SOL and elsewhere:
+        venue = "the pump.fun bonding curve (not graduated yet)" if dx.get("top_dex") == "pumpfun" else \
+            f"another pool ({dx.get('top_dex') or 'other DEX'}, ~${dx['top_liq_usd']:,.0f} liquidity)"
+        add("amber", f"This PumpSwap pool holds only {sol:.2f} SOL, but the token mainly trades on {venue}. "
+                     "Pelluca's pool checks do not cover that venue yet: check its liquidity there.")
+    elif sol < DEAD_SOL:
         add("red", f"Liquidity is gone: the pool holds {sol:.2f} SOL. You may not be able to sell.")
-    elif f.get("virt") and sol < GRAD_SOL * 0.35:
+    elif f.get("virt") and sol < GRAD_SOL * 0.35 and not elsewhere:
         add("red", f"The pool has lost {1 - sol / GRAD_SOL:.0%} of the ~{GRAD_SOL:.0f} SOL it started with at graduation.")
     lp = f.get("lp_live")
     if lp is not None and lp > 0.05:
@@ -218,7 +270,6 @@ def assess(f):
         add("info", f"The creator launched {h['n']} other graduated token(s); {h['drained']} drained now.")
     if f.get("top10") is None:
         add("info", "Holder concentration could not be read right now (RPC busy); try again in a minute.")
-    dx = f.get("dex") or {}
     if dx.get("change_h1", 0) > 0.8:
         add("amber", f"Already {dx['change_h1']:+.0%} in the last hour.")
     elif dx.get("change_h1", 0) <= -0.5:
@@ -259,7 +310,7 @@ def render(f, html=True):
     if dx.get("price_usd"):
         mc = f" | MC ${dx['mcap']:,.0f}" if dx.get("mcap") else ""
         lines.append(f"Price ${dx['price_usd']:.8g}{mc} | 1h {dx.get('change_h1', 0):+.0%} | 24h {dx.get('change_h24', 0):+.0%}")
-    if f.get("pool"):
+    if f.get("pool") and f.get("pool_sol") is not None:
         lines.append(f"Pool: {f['pool_sol']:.1f} SOL" + (f" (~${f['pool_sol'] * dx['sol_usd']:,.0f})" if dx.get("sol_usd") else ""))
     facts = []
     if f.get("top10") is not None:
@@ -287,7 +338,17 @@ def render(f, html=True):
 
 def main():
     if len(sys.argv) < 2 or not chain.is_address(sys.argv[1]):
-        sys.exit("usage: python -m memebot.pelluca.check <token contract address> [--timing]")
+        sys.exit("usage: python -m memebot.pelluca.check <token contract address> [--timing | --debug]")
+    if "--debug" in sys.argv:                            # what the report is built from, for bug reports
+        raw = dex_raw(sys.argv[1])
+        for p in (raw or {}).get("pairs") or []:
+            print("dex pair:", p.get("dexId"), p.get("pairAddress"), (p.get("quoteToken") or {}).get("symbol"),
+                  "liq", (p.get("liquidity") or {}).get("usd"), "mcap", p.get("marketCap"))
+        f = gather(sys.argv[1], dex=lambda m: raw)
+        print(json.dumps({k: v for k, v in f.items() if k != "dex"}, default=str, indent=1))
+        print("chosen dex:", json.dumps(f.get("dex"), default=str))
+        print(render(f, html=False))
+        return
     if "--timing" not in sys.argv:
         print(render(gather(sys.argv[1]), html=False))
         return
@@ -307,7 +368,7 @@ def main():
 
     def timed_dex(mint):
         t = time.time()
-        out = dex_info(mint)
+        out = dex_raw(mint)
         log.append((time.time() - t, "DexScreener", "ok" if out else "none"))
         return out
     t0 = time.time()

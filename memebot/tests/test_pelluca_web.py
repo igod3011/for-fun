@@ -113,3 +113,51 @@ class HttpPartsTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WrongPoolBugTest(unittest.TestCase):
+    """19/11/2026: a live coin showed 'pool 0.00 SOL, mcap $132B, liquidity gone'."""
+    WSOL = "So11111111111111111111111111111111111111112"
+
+    def pair(self, addr, dex, quote, liq, mcap, base=MINT):
+        return {"chainId": "solana", "pairAddress": addr, "dexId": dex, "priceUsd": "0.0001", "priceNative": "1e-6",
+                "baseToken": {"address": base, "symbol": "DCTY"}, "quoteToken": {"address": quote},
+                "liquidity": {"usd": liq}, "marketCap": mcap, "priceChange": {"h24": 500}}
+
+    def test_parse_dex_skips_junk_quote_and_prefers_own_pool(self):
+        from memebot.pelluca import check
+        d = {"pairs": [self.pair("JUNK", "pumpswap", "JunkMint", 9e12, 1.3e11),
+                       self.pair("BIG", "raydium", self.WSOL, 50000, 900000),
+                       self.pair("OURS", "pumpswap", self.WSOL, 20000, 880000)]}
+        x = check.parse_dex(d, mint=MINT, pool="OURS")
+        self.assertEqual((x["pair"], x["mcap"], x["top_pair"]), ("OURS", 880000, "BIG"))
+        self.assertEqual(check.parse_dex(d, mint=MINT)["pair"], "BIG")
+        absurd = {"pairs": [self.pair("X", "pumpswap", self.WSOL, 10, 1.3e11)]}
+        self.assertIsNone(check.parse_dex(absurd, mint=MINT)["mcap"])
+
+    def test_empty_pumpswap_pool_but_trading_elsewhere_is_not_drained(self):
+        from memebot.pelluca import check
+        f = facts(pool="OURS", pool_sol=0.0, dex={"top_pair": "CURVE", "top_dex": "pumpfun", "top_liq_usd": 30000})
+        flags, verdict = check.assess(f)
+        self.assertNotIn("Liquidity is gone", " ".join(t for _, t in flags))
+        self.assertIn("bonding curve", flags[0][1])
+        self.assertEqual(flags[0][0], "amber")
+
+    def test_unread_balance_is_not_zero(self):
+        from unittest import mock
+        from memebot.pelluca import chain, check
+        pool = {"pool": "P", "sol_acc": "S", "tok_acc": "T", "virt_sol": 30.0, "coin_creator": None,
+                "lp_mint": "L", "lp_supply": 100}
+        with mock.patch.object(chain, "pools_for_mint", return_value=[dict(pool)]), \
+             mock.patch.object(chain, "token_balances", return_value={}), \
+             mock.patch.object(chain, "supply_raw", return_value=0), \
+             mock.patch.object(chain, "supply", return_value=1e9), \
+             mock.patch.object(chain, "largest_accounts", return_value=[]), \
+             mock.patch.object(check.rpc, "mint_authorities", return_value=(None, None)):
+            f = check.gather(MINT, _call=lambda *a: None, dex=lambda m: None, now=1.0, _sleep=lambda s: None)
+        self.assertIsNone(f["pool_sol"])
+        flags, verdict = check.assess(f)
+        self.assertNotEqual(verdict, "HIGH RISK")
+        self.assertIn("could not be read", flags[0][1])
+        check.render(f)                                      # no crash on a missing balance
+        web.report_json(f)
