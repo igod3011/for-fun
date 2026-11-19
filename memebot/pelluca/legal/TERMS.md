@@ -1,11 +1,15 @@
 # Pelluca Terms of Service
 
-_Last updated: 19 November 2026 · Version 1.0_
+_Last updated: 19 November 2026 · Version 1.1_
 
 These Terms of Service ("Terms") govern your use of Pelluca: the website at pelluca.com, the Pelluca Telegram bot,
-and any related tools, reports and content (together, the "Service"). The Service is operated by
-[OPERATOR NAME] ("Pelluca", "we", "us"). By using the Service you agree to these Terms. If you do not agree, do not
-use the Service.
+and any related tools, reports and content (together, the "Service"). These Terms are an agreement between you and
+Pelluca ("Pelluca", "we", "us"). By accessing or using the Service in any way you agree to these Terms. If you do
+not agree, do not use the Service.
+
+**PELLUCA IS NOT A BROKER, EXCHANGE, FINANCIAL INSTITUTION, ADVISOR OR CUSTODIAN. IT CANNOT MOVE OR ACCESS YOUR
+FUNDS. MOST NEW TOKENS LOSE ALMOST ALL OF THEIR VALUE. YOU MAY LOSE ALL OF THE MONEY YOU PUT INTO ANY TOKEN, WHATEVER
+PELLUCA SAYS ABOUT IT.**
 
 ## 1. What Pelluca is
 
@@ -32,10 +36,13 @@ decisions. Do your own research and never risk money you cannot afford to lose.
 
 You must be **at least 18 years old** (or the age of majority where you live, if higher) to use the Service.
 
-You may not use the Service if you are located in, or a resident of, a country or region subject to comprehensive
-sanctions (for example by the United Nations, the United States, the European Union or the United Kingdom), or if
-you are on any sanctions list. You are responsible for making sure that using the Service, and any crypto activity
-you undertake, is legal where you live.
+You may not use the Service if you are located in, resident in, or a national of a Prohibited Jurisdiction:
+Afghanistan, Cuba, Iran, North Korea, Syria, Russia, Belarus, or the Crimea, Donetsk or Luhansk regions of Ukraine,
+or any other country or territory subject to comprehensive sanctions of the United Nations, the United States, the
+European Union or the United Kingdom. You may not use the Service if you are on any of their sanctions lists.
+
+You are responsible for making sure that using the Service, and any crypto activity you undertake, is legal where
+you live. We may refuse, limit or end access for anyone, in any region, at any time and for any reason.
 
 ## 4. Data sources and accuracy
 
@@ -109,25 +116,48 @@ bot or on the website.
 To the fullest extent permitted by law, we make no warranties of any kind, express or implied, including that the
 Service will be accurate, complete, timely, error-free, secure or fit for a particular purpose.
 
-## 12. Limitation of liability
+## 12. Assumption of risk
+
+You understand and accept the risks of crypto assets, including: extreme price swings; tokens losing all value;
+liquidity being removed ("rug pulls"); scams, impersonation and fake tokens; smart contract bugs; network congestion
+and outages; and changes in law or regulation. Pelluca is not responsible for any of these.
+
+## 13. Indemnity
+
+You agree to indemnify and hold harmless Pelluca and its operator from any claims, losses, liabilities and costs
+(including reasonable legal fees) arising from your use of the Service, your breach of these Terms, or your
+violation of any law or the rights of any third party.
+
+## 14. Limitation of liability
 
 To the fullest extent permitted by law, Pelluca and its operator will not be liable for any trading or investment
 losses, lost profits, lost data, or any indirect, incidental, special or consequential damages arising from your use
 of, or inability to use, the Service, even if we were told such losses were possible. Our total liability for any
-claim is limited to the amount you paid us in the 3 months before the claim, or 10 USD if you paid nothing.
+claim is limited to the greater of (a) the amount you paid us in the 3 months before the claim and (b) one hundred
+U.S. dollars (US$100).
 
 Nothing in these Terms limits liability that cannot be limited by law.
 
-## 13. Termination
+## 15. Termination
 
-You may stop using the Service at any time. We may suspend or end your access if you break these Terms or if
-required by law. Sections 2, 4, 9, 11, 12 and 14 survive termination.
+You may stop using the Service at any time. We may suspend or end your access at any time, including if you break
+these Terms or if required by law. Sections 2, 4, 9 and 11 to 16 survive termination.
 
-## 14. Governing law
+## 16. Governing law and disputes
 
-These Terms are governed by the laws of [JURISDICTION]. Before starting any formal dispute, contact us so we can try
-to resolve it informally.
+These Terms are governed by the laws of the British Virgin Islands.
 
-## 15. Contact
+Before starting any formal dispute, you must first contact us and give us 30 days to try to resolve it informally.
+Any dispute that is not resolved this way will be finally settled by binding arbitration administered by the BVI
+International Arbitration Centre under its rules, seated in Tortola, British Virgin Islands, before a single
+arbitrator, in English. You and we each waive the right to a court trial or a jury, except that either side may seek
+urgent injunctive relief in a competent court.
 
-Questions, data deletion requests and reports of impersonation: [CONTACT EMAIL] or the Pelluca Telegram bot.
+**You waive any right to bring or take part in a class action, class arbitration or other collective or
+representative proceeding against Pelluca.** Any claim must be started within one (1) year after the facts giving
+rise to it first arose, or it is permanently barred, to the extent the law allows.
+
+## 17. Contact
+
+Questions, data deletion requests, dispute notices and reports of impersonation: support@pelluca.com or the Pelluca
+Telegram bot.

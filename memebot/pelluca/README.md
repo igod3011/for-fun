@@ -9,8 +9,8 @@ cho sản phẩm thu phí, xem Notion "Tuần 1").
 - `/check <CA>` hoặc dán thẳng địa chỉ token: báo cáo rủi ro.
 - `/watch <CA>`: báo khi SOL trong pool giảm 30% trong 10 phút hoặc còn dưới 5 SOL.
 - `/unwatch <CA>`, `/list`, `/terms` (tóm tắt điều khoản + link pelluca.com/terms), `/help`.
-- Điều khoản dịch vụ đầy đủ (tiếng Anh): `memebot/pelluca/legal/TERMS.md`. Còn 3 chỗ cần điền trước khi ra mắt:
-  `[OPERATOR NAME]`, `[JURISDICTION]`, `[CONTACT EMAIL]`.
+- Điều khoản dịch vụ đầy đủ (tiếng Anh): `memebot/pelluca/legal/TERMS.md`. Viết theo mẫu pump.fun và GMGN
+  (luật BVI, trọng tài BVI IAC, bỏ quyền kiện tập thể, trần trách nhiệm 100 USD). Cần tạo email support@pelluca.com.
 - Giới hạn: 20 lần kiểm tra mỗi giờ, 10 token theo dõi mỗi người.
 
 ## Báo cáo /check gồm
