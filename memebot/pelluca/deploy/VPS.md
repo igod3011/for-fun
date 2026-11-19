@@ -6,7 +6,7 @@ Bạn tự thuê VPS và tự thanh toán. Không gửi mật khẩu, token hay 
 Vultr → Deploy → Cloud Compute (Shared CPU) → Singapore → Ubuntu 24.04 LTS → gói 1 vCPU / 1 GB (5 USD) → đặt
 mật khẩu root hoặc thêm khóa SSH → Deploy. Ghi lại địa chỉ IP.
 
-## 2. Đăng nhập (Command Prompt trên Windows có sẵn ssh)
+## 2. Đăng nhập (Terminal trên Mac hoặc Command Prompt trên Windows đều có sẵn ssh)
 ```
 ssh root@IP_CUA_VPS
 ```
@@ -22,21 +22,17 @@ adduser --disabled-password --gecos "" pelluca
 ```
 sudo -u pelluca git clone -b claude/mql5-market-product-5p7wht https://github.com/igod3011/for-fun.git /home/pelluca/app
 ```
-(Repo riêng tư: GitHub → Settings → Developer settings → Fine-grained token chỉ quyền đọc repo này, rồi dùng
-`https://TOKEN@github.com/igod3011/for-fun.git`. Token gõ trên VPS, không gửi vào chat.)
+(Repo đang công khai nên không cần token GitHub.)
 
 ## 4. Đặt token bot (chỉ nằm trên VPS)
+Lệnh hỏi token, dán vào (màn hình không hiện gì), Enter:
 ```
-nano /home/pelluca/pelluca.env
+read -rsp "Bot token: " T && echo && printf 'PELLUCA_BOT_TOKEN=%s\nPELLUCA_WATCH_FILE=/home/pelluca/pelluca_watch.json\n' "$T" > /home/pelluca/pelluca.env && unset T && chown pelluca:pelluca /home/pelluca/pelluca.env && chmod 600 /home/pelluca/pelluca.env
 ```
-Gõ vào file (thay bằng token thật), lưu bằng Ctrl+O, Enter, Ctrl+X:
+Nên thêm key Helius (gói miễn phí): RPC công khai gần như luôn từ chối lệnh đọc top holder, không có Helius một
+lần /check mất ~21 giây thay vì ~2 giây (đo 19/11/2026). Bot chỉ dùng Helius cho lệnh đó và khi RPC công khai bận.
 ```
-PELLUCA_BOT_TOKEN=token_cua_bot_pelluca
-PELLUCA_WATCH_FILE=/home/pelluca/pelluca_watch.json
-```
-Tùy chọn: thêm `HELIUS_API_KEY=...` để dự phòng khi RPC công khai bận.
-```
-chown pelluca:pelluca /home/pelluca/pelluca.env && chmod 600 /home/pelluca/pelluca.env
+read -rsp "Helius key: " K && echo && echo "HELIUS_API_KEY=$K" >> /home/pelluca/pelluca.env && unset K && chmod 600 /home/pelluca/pelluca.env
 ```
 
 ## 5. Chạy như dịch vụ (tự khởi động lại khi lỗi hoặc VPS khởi động lại)
@@ -48,6 +44,11 @@ systemctl daemon-reload && systemctl enable --now pelluca-bot
 ```
 Kiểm tra: `systemctl status pelluca-bot` phải ghi `active (running)`; nhật ký: `journalctl -u pelluca-bot -n 50`.
 Mở bot trên Telegram, gửi `/check` kèm một CA.
+
+Đo thời gian từng bước của một lần kiểm tra:
+```
+cd /home/pelluca/app && set -a && . /home/pelluca/pelluca.env && set +a && python3 -m memebot.pelluca.check <CA> --timing | grep -v TOKEN
+```
 
 ## 6. Cập nhật code sau này
 ```
