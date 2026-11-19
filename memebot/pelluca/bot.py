@@ -26,8 +26,20 @@ HELP = ("Pelluca checks Solana tokens before you buy.\n\n"
         f"/watch <CA> - alert me if its liquidity drops {DROP:.0%} within {WINDOW_MIN} min\n"
         "/unwatch <CA> - stop watching\n"
         "/list - tokens you watch\n"
+        "/terms - terms of service\n"
         "/help - this message\n\n"
-        "Read-only: Pelluca never asks for your wallet, seed phrase or keys. Not financial advice.")
+        "Read-only: Pelluca never asks for your wallet, seed phrase or keys. Not financial advice. "
+        "18+ only. By using Pelluca you accept the /terms.")
+
+TERMS_URL = "https://pelluca.com/terms"
+TERMS = ("<b>Pelluca terms, in short</b>\n"
+         "• Information only, not financial advice. Memecoins are extremely risky; you can lose everything.\n"
+         "• You must be 18+ and not in a sanctioned country.\n"
+         "• Read-only: we never hold funds or ask for your seed phrase or keys. Anyone who does is a scammer.\n"
+         "• Data (Solana chain, DexScreener) can be late or wrong; alerts are best effort.\n"
+         "• Payments are in SOL and cannot be reversed; pay the exact invoice before it expires.\n"
+         "• We store only your chat ID, the tokens you check or watch, and payment records.\n\n"
+         f"Full terms: {TERMS_URL}")
 
 
 class PellucaBot:
@@ -63,6 +75,8 @@ class PellucaBot:
             cmd, arg = "/check", parts[0]
         if cmd in ("/start", "/help"):
             return HELP
+        if cmd == "/terms":
+            return TERMS
         if cmd == "/list":
             ws = self.w.of(chat)
             if not ws:

@@ -183,6 +183,19 @@ class BotTest(unittest.TestCase):
             self.assertIn(MINT, bot.handle(5, "/list"))
             self.assertIn("Stopped", bot.handle(5, f"/unwatch {MINT}"))
 
+    def test_terms(self):
+        with tempfile.TemporaryDirectory() as d:
+            bot, _ = self.make(d)
+            self.assertIn("/terms", bot.handle(5, "/help"))
+            t = bot.handle(5, "/terms")
+            for s in ("not financial advice", "18+", "seed phrase", "pelluca.com/terms"):
+                self.assertIn(s, t)
+            here = os.path.dirname(os.path.abspath(__file__))
+            with open(os.path.join(here, "..", "pelluca", "legal", "TERMS.md"), encoding="utf-8") as f:
+                full = f.read()
+            for s in ("Not financial advice", "at least 18 years old", "non-refundable", "seed phrase"):
+                self.assertIn(s, full)
+
     def test_rate_limit(self):
         with tempfile.TemporaryDirectory() as d:
             bot, _ = self.make(d)

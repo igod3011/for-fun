@@ -8,7 +8,9 @@ cho sản phẩm thu phí, xem Notion "Tuần 1").
 ## Lệnh trong Telegram
 - `/check <CA>` hoặc dán thẳng địa chỉ token: báo cáo rủi ro.
 - `/watch <CA>`: báo khi SOL trong pool giảm 30% trong 10 phút hoặc còn dưới 5 SOL.
-- `/unwatch <CA>`, `/list`, `/help`.
+- `/unwatch <CA>`, `/list`, `/terms` (tóm tắt điều khoản + link pelluca.com/terms), `/help`.
+- Điều khoản dịch vụ đầy đủ (tiếng Anh): `memebot/pelluca/legal/TERMS.md`. Còn 3 chỗ cần điền trước khi ra mắt:
+  `[OPERATOR NAME]`, `[JURISDICTION]`, `[CONTACT EMAIL]`.
 - Giới hạn: 20 lần kiểm tra mỗi giờ, 10 token theo dõi mỗi người.
 
 ## Báo cáo /check gồm
