@@ -98,11 +98,22 @@ def md_to_html(md):
     return "\n".join(out)
 
 
+def asset_version():
+    """Changes whenever any file in web/ changes, so browsers fetch new CSS/JS right after a deploy."""
+    return str(int(max(os.path.getmtime(os.path.join(WEB, n)) for n in os.listdir(WEB))))
+
+
+def versioned(html):
+    """Pure (unit-tested): /static/x.css -> /static/x.css?v=<version> for CSS and JS links."""
+    v = asset_version()
+    return re.sub(r'(/static/[A-Za-z0-9._-]+\.(?:css|js))"', lambda m: f'{m.group(1)}?v={v}"', html)
+
+
 def terms_page():
     with open(TERMS_MD, encoding="utf-8") as fh:
         body = md_to_html(fh.read())
     with open(os.path.join(WEB, "terms.html"), encoding="utf-8") as fh:
-        return fh.read().replace("<!--TERMS-->", body)
+        return versioned(fh.read().replace("<!--TERMS-->", body))
 
 
 def static_path(name):
@@ -181,10 +192,10 @@ def make_handler(app):
                     status, obj = app.api_check(ca, client_ip(self.client_address[0], self.headers))
                     return self._send(status, json.dumps(obj), "application/json")
                 if path == "/terms":
-                    return self._send(200, terms_page(), TYPES[".html"], "public, max-age=300")
+                    return self._send(200, terms_page(), TYPES[".html"], "no-cache")
                 if path in PAGES:
-                    with open(os.path.join(WEB, PAGES[path]), "rb") as fh:
-                        return self._send(200, fh.read(), TYPES[".html"], "public, max-age=300")
+                    with open(os.path.join(WEB, PAGES[path]), encoding="utf-8") as fh:
+                        return self._send(200, versioned(fh.read()), TYPES[".html"], "no-cache")
                 if path.startswith("/static/"):
                     p = static_path(path[len("/static/"):])
                     if p:

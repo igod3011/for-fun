@@ -213,3 +213,11 @@ class DctyRegressionTest(unittest.TestCase):
         self.assertNotIn("Liquidity is gone", " ".join(t for _, t in flags))
         self.assertEqual(verdict, "LIMITED CHECK")            # the Meteora pool's LP is not checked: say so
         self.assertIn("Main liquidity: ~$412,546 on meteora", check.render(f, html=False))
+
+
+class CacheBustTest(unittest.TestCase):
+    def test_versioned_links(self):
+        h = web.versioned('<link href="/static/style.css"><script src="/static/app.js" defer></script><img src="/static/logo.svg">')
+        self.assertRegex(h, r'/static/style\.css\?v=\d+"')
+        self.assertRegex(h, r'/static/app\.js\?v=\d+"')
+        self.assertIn('/static/logo.svg"', h)                  # images keep plain URLs
